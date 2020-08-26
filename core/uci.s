@@ -6,7 +6,11 @@
 ; Copyright (c) 2020 - Gideon Zweijtzer
 ;
 ;----------------------------------------------------
-        .segment "ULTIMATE"
+.include "kernal.i"
+.include "persistent.i"
+.segment "ultimate"
+.feature labels_without_colons, c_comments
+
 ;
         CMD_IF_CONTROL = $DF1C
         CMD_IF_COMMAND = $DF1D
@@ -62,13 +66,24 @@
         SHOW_SEARCHING          = $F5AF
         SHOW_LOADING            = $F5D2
         SHOW_SAVING             = $F68F
+        FILE_NOT_FOUND_ERROR    = $F704
 
 
+.macro fc3exit addr
+            lda #>(addr-1)
+            pha
+            lda #<(addr-1)
+            pha
+            jmp _disable_rom
+.endmacro
+
+/*
 ulti_restor
             lda #9
             sta UCI_DEVICE
             jsr uci_clear_error
             jmp restor
+*/
 
 ; $FFD5 
 ; LOAD. Load or verify file. (Must call SETLFS and SETNAM beforehand.)
@@ -79,23 +94,24 @@ ulti_restor
 ; Vectors through $0330, after storing X in $C3 and Y in $C4 (LOADADDR)
 
 
-ultiload    ldx DEVNUM
-            cpx UCI_DEVICE
-            beq myload
-ld1         jmp (iload)
-
-myload      sta VERIFYFLAG
+.global ulti_load
+ulti_load:
             lda #$00
             sta STATUS
             ldy NAMELEN
-            bne ld2
-            jmp error8
-
-ld2         lda CMD_IF_COMMAND
-            cmp #UCI_IDENTIFIER
             bne ld1
+            lda #8 ; missing filename
+            sec
+            jmp _disable_rom
 
-            ldx SECADDR
+ld1         lda CMD_IF_COMMAND
+            cmp #UCI_IDENTIFIER
+            beq ld2
+            lda #5 ; device not present error
+            sec
+            jmp _disable_rom
+
+ld2         ldx SECADDR
             jsr SHOW_SEARCHING
             ldx #UCI_CMD_LOADSU
             jsr uci_setup_cmd
@@ -105,7 +121,9 @@ ld2         lda CMD_IF_COMMAND
             lda CMD_IF_STATUS
             jsr uci_ack ; restores A
             beq ld3 ; all OK when zero
-            jmp error4
+            lda #4  ; File not found error
+            sec
+            jmp _disable_rom
 
 ld3         jsr SHOW_LOADING
 
@@ -125,14 +143,16 @@ ld3         jsr SHOW_LOADING
             ldx LOADPNTR
             ldy LOADPNTR+1
             clc
-            rts
+            jmp _disable_rom
 
 _verify_err jsr uci_ack ; restores A
             lda #$10
             ora STATUS
             sta STATUS
             clc
-            rts
+            jmp _disable_rom
+
+
 
 ; $FFD8   
 ; SAVE. Save file. (Must call SETLFS and SETNAM beforehand.)
@@ -142,24 +162,24 @@ _verify_err jsr uci_ack ; restores A
 ; Real address: $F5DD.
 ; Vector through $0332, after storing start address in $C1 and $C2 and end address in $AE and $AF
 
-ultisave    lda DEVNUM
-            cmp UCI_DEVICE
-            beq mysave
-sv1         jmp (isave)
-
-mysave
+.global ulti_save
+ulti_save:
             lda #$00
             sta STATUS
             ldy NAMELEN
-            bne sv2
-            jmp error8
-
-sv2         lda CMD_IF_COMMAND
-            cmp #UCI_IDENTIFIER
             bne sv1
+            lda #8 ; missing filename
+            sec
+            jmp _disable_rom
 
-            jsr SHOW_SAVING
+sv1         lda CMD_IF_COMMAND
+            cmp #UCI_IDENTIFIER
+            beq sv2
+            lda #5 ; device not present
+            sec
+            jmp _disable_rom
 
+sv2         jsr SHOW_SAVING
             ldx #UCI_CMD_SAVE
             jsr uci_setup_cmd
             ldy #SAVEADDR
@@ -170,12 +190,14 @@ sv2         lda CMD_IF_COMMAND
 
             jsr uci_ack
             sec
+            lda #7 ; not output file :)
             rts
 
 sv3         jsr uci_ack
             clc
             rts
 
+/*
 ; $FFC0   
 ; OPEN. Open file. (Must call SETLFS and SETNAM beforehand.)
 ; Input: –
@@ -383,6 +405,7 @@ ulticlrchn  cpx UCI_DEVICE
             jmp unlsn ; if it was not us, it is serial
 _my_clrchn  jmp uci_abort
 
+*/
 ;; UCI
 
 uci_setup_cmd

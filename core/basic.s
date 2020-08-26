@@ -333,7 +333,7 @@ L8327:  cmp     #first_new_token ; first new token
         sec
 L832C:  jmp     _execute_statement
 
-L832F:  cmp     #$E9 ; last new token + 1
+L832F:  cmp     #(last_new_token)
         bcs     L832C
         sbc     #(first_new_token-1)
         asl     a
@@ -771,6 +771,10 @@ new_basic_keywords:
         .byte   "MREA", 'D' + $80         ; 63
         .byte   "MWRIT", 'E' + $80        ; 64
         .byte   "ULTIMAT", 'E' + $80      ; 65
+        .byte   "UDRIV", 'E' + $80        ; 66
+        .byte   "ULOA", 'D' + $80         ; 67
+        .byte   "UVERIF", 'Y' + $80       ; 68
+        .byte   "USAV", 'E' + $80         ; 69
         .byte 0
 
 command_vectors:
@@ -800,6 +804,11 @@ command_vectors:
         .word   MREAD-1
         .word   MWRITE-1
         .word   ULTIMATE-1
+        .word   UDRIVE-1
+        .word   ULOAD-1
+        .word   UVERIFY-1
+        .word   USAVE-1
+
 end_of_command_vectors:
 
 last_new_token = (first_new_token + (end_of_command_vectors - command_vectors)/2)
@@ -879,7 +888,7 @@ L8737:  jmp     WAF08 ; SYNTAX ERROR
 ; "RENUM" Command - renumber BASIC lines
 ; ----------------------------------------------------------------
 RENUM:  jsr     load_auto_defaults
-        jsr     L8512
+        jsr     L8512 ; check if end (return first next char)
         beq     L8749
         cmp     #','
         bne     L8737
@@ -2092,20 +2101,6 @@ L8FF9:  sty     $39 ; line number lo
 L900B:  rts
 
 
-ULTIMATE:
-        ldx #0
-:       lda a_ultimate,x
-        beq :+
-        jsr $E716 ; char to screen
-        inx
-        jmp :-
-:       jmp WA8F8
-
-a_ultimate:
-        .byte "THE ULTIMATE IS GREAT!", 13, 0
-
-
-
 ; ----------------------------------------------------------------
 ; "UNPACK" Command - decompress a program
 ; ----------------------------------------------------------------
@@ -2207,6 +2202,68 @@ L907A:  lda     __unpack_header_LOAD__,y
         sbc     $2E
         sta     $0817
         jmp     L8980
+
+
+; ----------------------------------------------------------------
+; "ULTIMATE" Command - print a nice message
+; ----------------------------------------------------------------
+ULTIMATE:
+        ldx #0
+:       lda a_ultimate,x
+        beq :+
+        jsr $E716 ; char to screen
+        inx
+        jmp :-
+:       jmp WA8F8
+
+a_ultimate:
+        .byte "THE ULTIMATE IS GREAT!", 13, 0
+
+; ----------------------------------------------------------------
+; "UDRIVE" Command - set current ultimate drive device ID
+; ----------------------------------------------------------------
+UDRIVE:
+        beq no_param
+        jsr _get_int
+        lda $15
+        beq _ok
+_nok:   lda #14 ; Illegal QTY
+        jmp _basic_warm_start
+_ok:    lda $14
+        beq _nok
+        sta UCI_DEVICE
+        jmp WA8F8
+no_param:
+        ldx UCI_DEVICE
+        lda #0
+        jsr _print_ax_int
+        jmp WA8F8
+
+; ----------------------------------------------------------------
+; "ULOAD" Command - load a program from disk
+; ----------------------------------------------------------------
+ULOAD:
+        lda     #0 ; load flag
+        .byte   $2C
+; ----------------------------------------------------------------
+; "DVERIFY" Command - verify a program on disk
+; ----------------------------------------------------------------
+UVERIFY:
+        lda     #1 ; verify flag
+        sta     $0A
+        jsr     set_filename_or_colon_asterisk
+        lda     UCI_DEVICE
+        sta     FA
+        jmp     WE16F
+
+; ----------------------------------------------------------------
+; "DSAVE" Command - save a program to disk
+; ----------------------------------------------------------------
+USAVE:  jsr     set_filename_or_empty
+        lda     UCI_DEVICE
+        sta     FA
+        jmp     WE159
+
 
 .segment "pack_code"
 

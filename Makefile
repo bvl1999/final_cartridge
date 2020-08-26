@@ -27,7 +27,7 @@ else
 	endif
 endif
 
-SOURCES=core/header.s core/vectors.s core/init.s core/basic.s core/drive.s core/desktop_helper.s core/speeder.s core/monitor.s core/wrappers.s core/junk.s core/editor.s core/printer.s core/format.s core/freezer.s core/persistent.s
+SOURCES=core/header.s core/vectors.s core/init.s core/basic.s core/drive.s core/desktop_helper.s core/speeder.s core/monitor.s core/wrappers.s core/junk.s core/editor.s core/printer.s core/format.s core/freezer.s core/persistent.s core/uci.s
 
 DEPS=core/kernal.i core/persistent.i
 
@@ -44,7 +44,7 @@ test: fc3.bin
 	@diff -u fc3-orig.bin.hexdump fc3.bin.hexdump
 
 fc3.bin: $(OBJECTS) core/fc3.cfg
-	$(LD) -C core/fc3.cfg $(OBJECTS) -o $@
+	$(LD) -C core/fc3.cfg $(OBJECTS) -o $@ -Ln labels.txt
 
 monitor.prg: core/monitor.o projects/monitor/monitor_support.o projects/monitor/monitor.cfg
 	$(LD) -C projects/monitor/monitor.cfg core/monitor.o projects/monitor/monitor_support.o -o $@ -Ln labels.txt

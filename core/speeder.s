@@ -8,6 +8,8 @@
 
 .global new_load
 .global new_save
+.import ulti_load
+.import ulti_save
 
 L0110           := $0110
 
@@ -156,10 +158,15 @@ L99D6:  pla
         pha
         jmp     _disable_rom_set_01
 
+do_uci_load:
+        jmp     ulti_load
+
 new_load2:
         sty     $93
         tya
         ldy     FA
+        cpy     UCI_DEVICE
+        beq     do_uci_load
         cpy     #7
         beq     L99B5 ; tape turbo
         cpy     #8
@@ -238,8 +245,13 @@ L9A6A:  jmp     $F5ED ; default SAVE vector
 
 L9A6D:  jmp     $A7C6 ; interpreter loop
 
+do_uci_save:
+        jmp     ulti_save
+
 new_save2:
         lda     FA
+        cmp     UCI_DEVICE
+        beq     do_uci_save
         cmp     #7
         beq     L9A6D ; tape turbo
         cmp     #8
