@@ -29,7 +29,9 @@
 .import _list
 .import _load_ac_indy
 .import _load_FNADR_indy
+.import _new_bsin
 .import _new_bsout
+.import _new_ckin
 .import _new_ckout
 .import _new_clall
 .import _new_clrch
@@ -48,3 +50,5 @@
 .import _a_colon_asterisk
 .import _a_colon_asterisk_end
 .import _bar_irq
+.import _new_open
+.import _new_close

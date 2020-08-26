@@ -6,14 +6,19 @@
 
 .include "kernal.i"
 .include "persistent.i"
+.feature c_comments
 
 .global set_io_vectors_with_hidden_rom
 .global set_io_vectors
 .global something_with_printer
+.global new_ckin
 .global new_ckout
+.global new_bsin
 .global new_bsout
 .global new_clall
 .global new_clrch
+.global new_open
+.global new_close
 
 .segment "printer"
 
@@ -150,46 +155,71 @@ LA0FF:  lda     $DD0D
         sec
         rts
 ; ----------------------------------------------------------------
+/*
+
+        OPEN_VECTOR   = $031A
+        CLOSE_VECTOR  = $031C
+        CHKIN_VECTOR  = $031E
+        CHKOUT_VECTOR = $0320
+        CLRCHN_VECTOR = $0322
+        CHRIN_VECTOR  = $0324
+        CHROUT_VECTOR = $0326
+        STOP_VECTOR   = $0328
+        GETIN_VECTOR  = $032A
+        CLALL_VECTOR  = $032C
+
+        LOAD_VECTOR   = $0330
+        SAVE_VECTOR   = $0332
+*/
+hidden_vectors:
+        .addr _new_open
+        .addr _new_close
+        .addr _new_ckin
+        .addr _new_ckout
+        .addr _new_clrch
+        .addr _new_bsin
+        .addr _new_bsout
+        .addr 0
+        .addr 0;_new_getin
+        .addr _new_clall
+
+rom_vectors:
+        .addr new_open2
+        .addr new_close2
+        .addr new_ckin2
+        .addr new_ckout
+        .addr new_clrch2
+        .addr new_bsin2
+        .addr new_bsout2
+        .addr 0
+        .addr 0;new_getin
+        .addr new_clall2
 
 ; these routines turn the cartridge ROM on before,
 ; and turn it back off afterwards
 set_io_vectors_with_hidden_rom2:
-        lda     #<_new_ckout
-        ldy     #>_new_ckout
-        sta     $0320 ; CKOUT
-        sty     $0321
-        lda     #<_new_bsout
-        ldy     #>_new_bsout
-        sta     $0326 ; BSOUT
-        sty     $0327
-        lda     #<_new_clrch
-        ldy     #>_new_clrch
-        sta     $0322 ; CLRCH
-        sty     $0323
-        lda     #<_new_clall
-        ldy     #>_new_clall
-        sta     $032C ; CLALL
-        sty     $032D
+        ldy     #18
+:       lda     hidden_vectors+1,y
+        beq     :+
+        sta     $031B,y
+        lda     hidden_vectors,y
+        sta     $031A,y
+:       dey
+        dey
+        bpl     :--
         rts
 
 ; these routines assume the cartridge ROM is mapped
 set_io_vectors2:
-        lda     #<new_ckout
-        ldy     #>new_ckout
-        sta     $0320 ; CKOUT
-        sty     $0321
-        lda     #<new_bsout2
-        ldy     #>new_bsout2
-        sta     $0326 ; BSOUT
-        sty     $0327
-        lda     #<new_clrch2
-        ldy     #>new_clrch2
-        sta     $0322 ; CLRCH
-        sty     $0323
-        lda     #<new_clall2
-        ldy     #>new_clall2
-        sta     $032C ; CLALL
-        sty     $032D
+        ldy     #18
+:       lda     rom_vectors+1,y
+        beq     :+
+        sta     $031B,y
+        lda     rom_vectors,y
+        sta     $031A,y
+:       dey
+        dey
+        bpl     :--
         rts
 
 ; ----------------------------------------------------------------
@@ -708,3 +738,39 @@ LA4F0:  rts
 
 ;        .byte   $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
 ;        .byte   $FF,$FF,$FF,$FF,$FF,$FF,$FF
+
+; ----------------------------------------------------------------
+new_open:
+        jsr new_open2
+        jmp _disable_rom
+
+new_open2:
+        ; should always exit with RTS!
+        jmp (OPEN_ORIG)
+
+; ----------------------------------------------------------------
+new_close:
+        jsr new_close2
+        jmp _disable_rom
+
+new_close2:
+        ; should always exit with RTS!
+        jmp (CLOSE_ORIG)
+
+; ----------------------------------------------------------------
+new_ckin:
+        jsr new_ckin2
+        jmp _disable_rom
+
+new_ckin2:
+        ; should always exit with RTS!
+        jmp (CHKIN_ORIG)
+
+; ----------------------------------------------------------------
+new_bsin:
+        jsr new_bsin2
+        jmp _disable_rom
+
+new_bsin2:
+        ; should always exit with RTS!
+        jmp (CHRIN_ORIG)

@@ -26,11 +26,6 @@ LBFFA           := $BFFA
 
 .segment "basic_init"
 
-; ??? unused?
-        jsr     set_io_vectors_with_hidden_rom
-        lda     #$43 ; bank 2
-        jmp     _jmp_bank
-
 init_load_and_basic_vectors:
         jsr     init_load_save_vectors
 init_basic_vectors:

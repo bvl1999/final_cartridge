@@ -44,3 +44,15 @@ FC3_EDITFLAG    := $02AB
 FC3_LINENRTMP   := $02AC
 UCI_DEVICE      := $02AD
 UCI_OUTLEN      := $02AE
+
+OPEN_ORIG     := $fd36
+CLOSE_ORIG    := $fd38
+CHKIN_ORIG    := $fd3a
+CHKOUT_ORIG   := $fd3c
+CLRCHN_ORIG   := $fd3e
+CHRIN_ORIG    := $fd40
+CHROUT_ORIG   := $fd42
+STOP_ORIG     := $fd44
+GETIN_ORIG    := $fd46
+LOAD_ORIG     := $fd4c
+SAVE_ORIG     := $fd4e
