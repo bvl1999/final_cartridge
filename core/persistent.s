@@ -76,7 +76,8 @@ enable_all_roms:
 
 .global _new_load
 _new_load: ; $DE20
-        tay     ; load/verify flag
+        tay     ; load/verify flag  (tay appears twice here, since the FC3 uses the $0330 vector to determine whether it should use the PAL or NTSC load routine!)
+        tay     ; load/verify flag  (it increments $0330 based on the PAL/NTSC flag!)
         lda     $01
         pha
         jsr     enable_all_roms
@@ -114,7 +115,7 @@ _new_expression: ; $DE4F
 
 .global _kbd_handler
 _kbd_handler:
-        lda     $02A7
+        lda     FC3_KBFLAG
         beq     LDE5D
         jmp     $EB42 ; LDA #$7F : STA $DC00 : RTS
 

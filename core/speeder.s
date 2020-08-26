@@ -18,6 +18,111 @@ new_load:
 new_save:
 	jmp new_save2
 
+send_byte:
+        pha
+ :      bit     $DD00
+        bpl     :-
+        lsr     a
+        lsr     a
+        lsr     a
+        lsr     a
+        tax
+:       lda     $D012
+        cmp     #$31
+        bcc     :+
+        and     #$06
+        cmp     #$02
+        beq     :-
+:       lda     #$07
+        sta     $DD00
+        lda     iec_tab,x
+        nop
+        nop
+        sta     $DD00
+        lsr     a
+        lsr     a
+        and     #$F7
+        sta     $DD00
+        pla
+        and     #$0F
+        tax
+        lda     iec_tab,x
+        sta     $DD00
+        lsr     a
+        lsr     a
+        and     #$F7
+        sta     $DD00
+        lda     #$17
+        nop
+        nop
+        sta     $DD00
+        rts
+.assert >* = >send_byte, error, "Page boundary!"
+
+iec_tab:
+        .byte   $07,$87,$27,$A7,$47,$C7,$67,$E7
+        .byte   $17,$97,$37,$B7,$57,$D7,$77,$F7
+.assert >* = >iec_tab, error, "Page boundary!"
+
+receive_4_bytes:
+       lda     $0330
+        cmp     #<_new_load
+        beq     L998B
+:       bit     $DD00
+        bvs     :-
+        ldy     #3
+        nop
+        ldx     $01
+:       lda     $DD00
+        lsr     a
+        lsr     a
+        nop
+        nop
+        ora     $DD00
+        lsr     a
+        lsr     a
+        nop
+        nop
+        ora     $DD00
+        lsr     a
+        lsr     a
+        nop
+        nop
+        ora     $DD00
+        sta     $C1,y
+        dey
+        bpl     :-
+.assert >* = >:-, error, "Page boundary!"
+        rts
+
+L998B:  bit     $DD00
+        bvs     L998B
+        ldy     #3
+        nop
+        ldx     $01
+L9995:  lda     $DD00
+        lsr     a
+        lsr     a
+        nop
+        nop
+        nop
+        ora     $DD00
+        lsr     a
+        lsr     a
+        nop
+        nop
+        ora     $DD00
+        lsr     a
+        lsr     a
+        nop
+        nop
+        ora     $DD00
+        sta     $C1,y
+        dey
+        bpl     L9995
+        rts
+.assert >* = >L998B, error, "Page boundary!"
+
 ; *** tape
 L99B5:  tax
         beq     L99C3
@@ -1312,108 +1417,3 @@ LA9F6:  dex
 ; XXX junk
         sei
         rts
-
-send_byte:
-        pha
- :      bit     $DD00
-        bpl     :-
-        lsr     a
-        lsr     a
-        lsr     a
-        lsr     a
-        tax
-:       lda     $D012
-        cmp     #$31
-        bcc     :+
-        and     #$06
-        cmp     #$02
-        beq     :-
-:       lda     #$07
-        sta     $DD00
-        lda     iec_tab,x
-        nop
-        nop
-        sta     $DD00
-        lsr     a
-        lsr     a
-        and     #$F7
-        sta     $DD00
-        pla
-        and     #$0F
-        tax
-        lda     iec_tab,x
-        sta     $DD00
-        lsr     a
-        lsr     a
-        and     #$F7
-        sta     $DD00
-        lda     #$17
-        nop
-        nop
-        sta     $DD00
-        rts
-.assert >* = >send_byte, error, "Page boundary!"
-
-iec_tab:
-        .byte   $07,$87,$27,$A7,$47,$C7,$67,$E7
-        .byte   $17,$97,$37,$B7,$57,$D7,$77,$F7
-.assert >* = >iec_tab, error, "Page boundary!"
-
-receive_4_bytes:
-       lda     $0330
-        cmp     #<_new_load
-        beq     L998B
-:       bit     $DD00
-        bvs     :-
-        ldy     #3
-        nop
-        ldx     $01
-:       lda     $DD00
-        lsr     a
-        lsr     a
-        nop
-        nop
-        ora     $DD00
-        lsr     a
-        lsr     a
-        nop
-        nop
-        ora     $DD00
-        lsr     a
-        lsr     a
-        nop
-        nop
-        ora     $DD00
-        sta     $C1,y
-        dey
-        bpl     :-
-.assert >* = >:-, error, "Page boundary!"
-        rts
-
-L998B:  bit     $DD00
-        bvs     L998B
-        ldy     #3
-        nop
-        ldx     $01
-L9995:  lda     $DD00
-        lsr     a
-        lsr     a
-        nop
-        nop
-        nop
-        ora     $DD00
-        lsr     a
-        lsr     a
-        nop
-        nop
-        ora     $DD00
-        lsr     a
-        lsr     a
-        nop
-        nop
-        ora     $DD00
-        sta     $C1,y
-        dey
-        bpl     L9995
-        rts
-.assert >* = >L998B, error, "Page boundary!"

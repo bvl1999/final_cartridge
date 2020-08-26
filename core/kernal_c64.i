@@ -35,3 +35,12 @@ LDTB1           := $D9   ; screen line link table
 BUF             := $0200 ; system input buffer
 KEYD            := $0277 ; keyboard buffer
 RPTFLG          := $028A ; key repeat flag
+
+FC3_KBFLAG      := $02A7
+FC3_BARFLAG     := $02A8
+FC3_AUTOFLAG    := $02A9
+FC3_TRACEFLAG   := $02AA
+FC3_EDITFLAG    := $02AB
+FC3_LINENRTMP   := $02AC
+UCI_OURDEVICE   := $02AD
+UCI_OUTLEN      := $02AE

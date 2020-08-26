@@ -66,7 +66,7 @@ load_and_run_program:
         iny
         sty     $0A
         sty     FNADR
-        sty     $02A8
+        sty     FC3_BARFLAG
         lda     #1 ; secondary address
         sta     SA
         lda     #>$0200

@@ -706,5 +706,5 @@ LA4E6:  lda     $DD0C
 LA4F0:  rts
 ; ----------------------------------------------------------------
 
-        .byte   $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
-        .byte   $FF,$FF,$FF,$FF,$FF,$FF,$FF
+;        .byte   $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
+;        .byte   $FF,$FF,$FF,$FF,$FF,$FF,$FF

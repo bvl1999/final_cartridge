@@ -62,7 +62,7 @@ L925D:  cmp     #$14 ; CTRL + DEL: delete to end of line
 L926A:  cmp     #CR ; CTRL + CR: print screen
         bne     L927C
         jsr     L93B4
-        inc     $02A7
+        inc     FC3_KBFLAG
         inc     $CC
         jsr     print_screen
         jmp     L92CC
@@ -75,7 +75,7 @@ L9282:  cmp     #$11 ; DOWN
         beq     L92DD
         pha
         lda     #0
-        sta     $02AB
+        sta     FC3_EDITFLAG
         pla
         sec
         sbc     #$85 ; KEY_F1
@@ -113,15 +113,15 @@ L92C5:  lda     #$7F
         bne     L927F ; always
 
 L92CC:  sei
-        lsr     $02A7
+        lsr     FC3_KBFLAG
         lsr     $CC
         jmp     L92C5
 
-L92D5:  lsr     $02A7
+L92D5:  lsr     FC3_KBFLAG
         lsr     $CC
         jmp     L927C
 
-L92DD:  inc     $02A7
+L92DD:  inc     FC3_KBFLAG
         inc     $CC
         txa
         and     #1
@@ -130,7 +130,7 @@ L92DD:  inc     $02A7
         cmp     #24
         bne     L92D5
         jsr     L93B4
-        bit     $02AB
+        bit     FC3_EDITFLAG
         bmi     L9312
         ldx     #25
 L92F7:  dex
@@ -158,7 +158,7 @@ L9322:  lda     #$8D
         jsr     $E716 ; output character to the screen
         jsr     L9448
         lda     #$80
-        sta     $02AB
+        sta     FC3_EDITFLAG
         ldy     PNTR
         beq     L933A
 L9333:  cpy     #40
@@ -172,7 +172,7 @@ L933A:  sty     PNTR
 L9342:  lda     TBLX
         bne     L92D5
         jsr     L93B4
-        bit     $02AB
+        bit     FC3_EDITFLAG
         bvs     L9361
         ldx     #$FF
 L9350:  inx
@@ -190,7 +190,7 @@ L9361:  lda     $5F
         cpx     $2C
         bne     L9375
         lda     #0
-        sta     $02AB
+        sta     FC3_EDITFLAG
 L9372:  jmp     L92D5
 
 L9375:  sta     TXTPTR
@@ -222,7 +222,7 @@ L9380:  tax
         jsr     L9448
         jsr     $E566 ; cursor home
         lda     #$40
-        sta     $02AB
+        sta     FC3_EDITFLAG
         jmp     L92CC
 
 L93B4:  lsr     $CF

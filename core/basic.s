@@ -98,8 +98,8 @@
 .global new_detokenize
 
 ; variables
-trace_flag      := $02AA
-bar_flag        := $02A8
+trace_flag      := FC3_TRACEFLAG
+bar_flag        := FC3_BARFLAG
 
 
 .segment "basic_commands"
@@ -157,7 +157,7 @@ AUTO:   jsr     load_auto_defaults
         pla
         pla
         lda     #$40
-L81FB:  sta     $02A9
+L81FB:  sta     FC3_AUTOFLAG
 ; code is laid out so it flows into new_mainloop
 
 ; ----------------------------------------------------------------
@@ -178,7 +178,7 @@ new_mainloop:
         tax
         beq     L81FB
         ldx     $3A
-        stx     $02AC
+        stx     FC3_LINENRTMP
         ldx     #$FF
         stx     $3A
         bcc     L822B
@@ -188,8 +188,8 @@ new_mainloop:
 L822B:  jsr     _get_line_number
         tax
         bne     L8234
-        sta     $02A9
-L8234:  bit     $02A9
+        sta     FC3_AUTOFLAG
+L8234:  bit     FC3_AUTOFLAG
         bvc     L824D
         clc
         lda     $14
@@ -398,7 +398,7 @@ HELP:   ldx     $3A ; line number hi
         lda     TXTPTR + 1
         cmp     #>$0200
         bne     L839D ; not direct mode
-        ldx     $02AC
+        ldx     FC3_LINENRTMP
         stx     $3A ; line number hi
 L839D:  ldx     $3A ; line number hi
         stx     $15
@@ -1620,8 +1620,8 @@ L8C78:  sei
         sta     $028F ; set keyboard decode pointer
         stx     $0290
         lda     #0
-        sta     $02A7
-        sta     $02AB
+        sta     FC3_KBFLAG
+        sta     FC3_EDITFLAG
         cli
         rts
 
