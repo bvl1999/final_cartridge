@@ -67,6 +67,7 @@
 .import WE1D4
 .import disable_rom_jmp_overflow_error
 .import disable_rom_then_warm_start
+.import disable_rom_jmp_error
 
 ; from init
 .import go_basic
@@ -2227,8 +2228,8 @@ UDRIVE:
         jsr _get_int
         lda $15
         beq _ok
-_nok:   lda #14 ; Illegal QTY
-        jmp _basic_warm_start
+_nok:   ldx #14 ; Illegal QTY
+        jmp disable_rom_jmp_error
 _ok:    lda $14
         beq _nok
         sta UCI_DEVICE

@@ -80,6 +80,8 @@ L805A:  sta     $02,y
         jsr     $FF5B ; video reset (same as CINT)
         jsr     $E453 ; assign $0300 BASIC vectors
         jsr     init_load_and_basic_vectors
+        lda     #11
+        sta     UCI_DEVICE
         cli
         pla ; $ D
         tax
