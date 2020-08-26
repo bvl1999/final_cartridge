@@ -358,6 +358,7 @@ _new_clrch: ; $DFD5
         jsr     _enable_rom
         jmp     new_clrch
 
+/*
 .global LDFE0
 LDFE0:
         sei
@@ -371,7 +372,7 @@ _bar_irq:
         pha
         lda     #$41 ; bank 1 (Notepad, BASIC (Menu Bar))
         sta     $DFFF
-
+*/
 .global _a_colon_asterisk
 _a_colon_asterisk:
         .byte   ':','*'

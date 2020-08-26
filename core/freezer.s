@@ -50,7 +50,7 @@ LBFC7:  lda     $02,x ; copy $02 - $0C onto stack
         lda     #$7C
         sta     $DD0D ; disable some NMIs? (???)
         ldx     #3
-        jmp     LDFE0 ; ???
+        ;jmp     LDFE0 ; ???
 
 .segment "freezer_vectors"
 
