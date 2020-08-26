@@ -45,7 +45,6 @@
 .import _print_banner_load_and_run
 .import _relink
 .import _search_for_line
-.import _set_txtptr_to_start
 .import _a_colon_asterisk
 .import _a_colon_asterisk_end
 .import _bar_irq

@@ -6,6 +6,7 @@
 ; area at $DE00-$DFFF, so it's always visible.
 ; It mostly contains wrappers around BASIC, KERNAL or cartridge
 ; functions that switch the ROM config in addition.
+.feature c_comments
 
 .include "kernal.i"
 
@@ -36,7 +37,8 @@
 ; from desktop_helper
 .import load_and_run_program
 
-.segment        "romio"
+.segment        "romio1"
+        .byte "ACIA"
 
 LDE00:  .byte   $40
 
@@ -74,8 +76,7 @@ enable_all_roms:
 
 .global _new_load
 _new_load: ; $DE20
-        tay
-        tay ; XXX
+        tay     ; load/verify flag
         lda     $01
         pha
         jsr     enable_all_roms
@@ -188,12 +189,6 @@ _basic_bsout: ; $DEB8
         jsr     $AB47 ; print character
         jmp     _enable_rom
 
-.global _set_txtptr_to_start
-_set_txtptr_to_start: ; $DEC1
-        jsr     _disable_rom
-        jsr     $A68E ; set TXTPTR to start of program
-        jmp     _enable_rom
-
 .global _check_for_stop
 _check_for_stop: ; $DECA
         jsr     _disable_rom
@@ -219,11 +214,24 @@ _int_to_ascii: ; $DEE4
         jsr     $BDDD ; convert FAC to ASCII
         jmp     _enable_rom
 
+.global _search_for_line
+_search_for_line: ; $DF0F
+        jsr     _disable_rom
+        jsr     $A613 ; search for BASIC line
+        php
+        jsr     _enable_rom
+        plp
+        rts
+
 .global _ay_to_float
 _ay_to_float: ; $DEF0
         jsr     _disable_rom
         jsr     $B395 ; convert A/Y to float
         jmp     LDEFF
+
+.segment        "romio2"
+        .byte "REU REU REU REU "
+        .byte "REU REU REU UCI "
 
 .global _int_to_fac
 _int_to_fac: ; $DEF9
@@ -239,15 +247,6 @@ _print_ax_int: ; $DF06
         jsr     _disable_rom
         jsr     $BDCD ; LINPRT print A/X as integer
         jmp     _enable_rom
-
-.global _search_for_line
-_search_for_line: ; $DF0F
-        jsr     _disable_rom
-        jsr     $A613 ; search for BASIC line
-        php
-        jsr     _enable_rom
-        plp
-        rts
 
 .global _CHRGET
 _CHRGET: ; $DF1B
@@ -315,13 +314,14 @@ _list: ; $DF6E
         jsr     _disable_rom
         jmp     $A6F3 ; part of LIST
 
+/*
 .global _print_banner_load_and_run
 _print_banner_load_and_run: ; $DF74
         jsr     _disable_rom
         jsr     $E422 ; print c64 banner
         jsr     _enable_rom
         jmp     load_and_run_program
-
+*/
 LDF80:  cmp     #$94 ; contents of $A000 in BASIC ROM
         bne     LDF8A ; BASIC ROM not visible
         jsr     _enable_rom
@@ -334,14 +334,6 @@ _new_tokenize: ; $DF8D
         jsr     _enable_rom
         jsr     new_tokenize
         jmp     _disable_rom
-
-;padding
-        .byte   $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
-        .byte   $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
-        .byte   $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
-        .byte   $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
-        .byte   $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
-        .byte   $FF,$FF
 
 ; calls into banks 0+1
 .global _new_ckout
@@ -365,15 +357,8 @@ _new_clrch: ; $DFD5
         jsr     _enable_rom
         jmp     new_clrch
 
-; padding
-        .byte   $FF,$FF,$FF,$FF,$FF
-
 .global LDFE0
-LDFE0: ; XXX BUG ???
-        .byte   $FF,$FF,$FF ; ISC ($FFFF),X
-        .byte   $FF,$FF,$FF ; ISC ($FFFF),X
-        .byte   $FF,$FF     ; ISC ($78FF),X - consumes "SEI"
-
+LDFE0:
         sei
         lda     #$42 ; bank 2 (Desktop, Freezer/Print)
         sta     $DFFF

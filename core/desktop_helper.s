@@ -38,7 +38,9 @@
 .global perform_operation_for_desktop
 
 .segment "desktop_helper"
+.feature c_comments
 
+/*
 reset_load_and_run:
         sei
         lda     #<$EA31
@@ -294,4 +296,4 @@ print_character:
         lda     $0200
         jsr     BSOUT
         jmp     jmp_bank_from_stack
-
+*/

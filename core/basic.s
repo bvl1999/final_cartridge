@@ -31,6 +31,7 @@
 ; "UNPACK" Command  - decompress a program
 ; "PACK" Command    - compress a program
 
+.feature c_comments
 .include "kernal.i"
 .include "persistent.i"
 
@@ -99,6 +100,7 @@
 ; variables
 trace_flag      := $02AA
 bar_flag        := $02A8
+
 
 .segment "basic_commands"
 
@@ -237,26 +239,25 @@ L8283:  sty     $71
         sty     $22
         ldy     #>(new_basic_keywords - 1)
         sty     $23
-L828F:  ldy     #0
+        ldy     #(first_new_token - $80)
         sty     $0B
+
+L828F:  ldy     #0
         dex
 L8294:  inx
         inc     $22
         bne     L829B
         inc     $23
+        ; check current keyword, pointed by $22
 L829B:  lda     $0200,x
+        ;beq     L82B4 ; gideon
         sec
         sbc     ($22),y
         beq     L8294
         cmp     #$80
-        bne     L82E2
-        ldy     $23
-        cpy     #$A9
-        bcs     L82B2
-        lda     $0B
-        adc     #$CC
-        .byte   $2C
-L82B2:  ora     $0B
+        bne     L82E2 ; keyword not matched
+        ; keyword matched!
+        ora     $0B   ; $80 + current keyword index
 L82B4:  ldy     $71
 
 ; **** this is the same code as BASIC ROM $A5C9-$A5F8 (start) ****
@@ -296,14 +297,17 @@ L82EF:  plp
         bpl     L82E6
         lda     ($22),y
         bne     L829B
-        lda     $23
-        cmp     #$A9
-        bcs     L8306
-        lda     #$A9
+        ; end of keyword list.
+        lda     $0B
+        cmp     #(first_new_token - $7f)
+        bcc     L8306
+        lda     #>(basic_keywords - 1)
         sta     $23
-        lda     #$FF
+        lda     #<(basic_keywords - 1)
         sta     $22
-        bne     L828F ; always
+        lda     #$00
+        sta     $0B
+        beq     L828F ; always
 
 ; **** this is the same code as BASIC ROM $A604-$A612 (start) ****
 L8306:  lda     $0200,x
@@ -324,14 +328,14 @@ new_execute:
         beq     L8327 ; no tracing
         jsr     trace_command
         jsr     _CHRGOT
-L8327:  cmp     #$CC ; first new token
+L8327:  cmp     #first_new_token ; first new token
         bcs     L832F
         sec
 L832C:  jmp     _execute_statement
 
 L832F:  cmp     #$E9 ; last new token + 1
         bcs     L832C
-        sbc     #$CB
+        sbc     #(first_new_token-1)
         asl     a
         tay
         lda     command_vectors+1,y
@@ -738,37 +742,35 @@ auto_defaults_end:
         .byte   $FF
 
 ; ----------------------------------------------------------------
+first_new_token = $CC
 
 new_basic_keywords:
-        .byte   "OF", 'F' + $80
-        .byte   "AUT", 'O' + $80
-        .byte   "DE", 'L' + $80
-        .byte   "RENU", 'M' + $80
-        .byte   "HEL", 'P' + $80
-        .byte   "FIN", 'D' + $80
-        .byte   "OL", 'D' + $80
-        .byte   "DLOA", 'D' + $80
-        .byte   "DVERIF", 'Y' + $80
-        .byte   "DSAV", 'E' + $80
-        .byte   "APPEN", 'D' + $80
-        .byte   "DAPPEN", 'D' + $80
-        .byte   "DO", 'S' + $80
-        .byte   "KIL", 'L' + $80
-        .byte   "MO", 'N' + $80
-        .byte   "PDI", 'R' + $80
-        .byte   "PLIS", 'T' + $80
-        .byte   "BA", 'R' + $80
-        .byte   "DESKTO", 'P' + $80
-        .byte   "DUM", 'P' + $80
-        .byte   "ARRA", 'Y' + $80
-        .byte   "ME", 'M' + $80
-        .byte   "TRAC", 'E' + $80
-        .byte   "REPLAC", 'E' + $80
-        .byte   "ORDE", 'R' + $80
-        .byte   "PAC", 'K' + $80
-        .byte   "UNPAC", 'K' + $80
-        .byte   "MREA", 'D' + $80
-        .byte   "MWRIT", 'E' + $80
+        .byte   "OF", 'F' + $80           ; 4C
+        .byte   "AUT", 'O' + $80          ; 4D
+        .byte   "DE", 'L' + $80           ; 4E
+        .byte   "RENU", 'M' + $80         ; 4F
+        .byte   "HEL", 'P' + $80          ; 50
+        .byte   "FIN", 'D' + $80          ; 51
+        .byte   "OL", 'D' + $80           ; 52
+        .byte   "DLOA", 'D' + $80         ; 53
+        .byte   "DVERIF", 'Y' + $80       ; 54
+        .byte   "DSAV", 'E' + $80         ; 55
+        .byte   "APPEN", 'D' + $80        ; 56
+        .byte   "DAPPEN", 'D' + $80       ; 57
+        .byte   "DO", 'S' + $80           ; 58
+        .byte   "KIL", 'L' + $80          ; 59
+        .byte   "MO", 'N' + $80           ; 5A
+        .byte   "DUM", 'P' + $80          ; 5B
+        .byte   "ARRA", 'Y' + $80         ; 5C
+        .byte   "ME", 'M' + $80           ; 5D
+        .byte   "TRAC", 'E' + $80         ; 5E
+        .byte   "REPLAC", 'E' + $80       ; 5F
+        .byte   "ORDE", 'R' + $80         ; 60
+        .byte   "PAC", 'K' + $80          ; 61
+        .byte   "UNPAC", 'K' + $80        ; 62
+        .byte   "MREA", 'D' + $80         ; 63
+        .byte   "MWRIT", 'E' + $80        ; 64
+        .byte   "ULTIMAT", 'E' + $80      ; 65
         .byte 0
 
 command_vectors:
@@ -787,10 +789,6 @@ command_vectors:
         .word   DOS-1
         .word   KILL-1
         .word   MON-1
-        .word   PDIR-1
-        .word   PLIST-1
-        .word   BAR-1
-        .word   DESKTOP-1
         .word   DUMP-1
         .word   ARRAY-1
         .word   MEM-1
@@ -801,6 +799,10 @@ command_vectors:
         .word   UNPACK-1
         .word   MREAD-1
         .word   MWRITE-1
+        .word   ULTIMATE-1
+end_of_command_vectors:
+
+last_new_token = (first_new_token + (end_of_command_vectors - command_vectors)/2)
 
 ; ----------------------------------------------------------------
 ; "MREAD" Command - read 192 bytes from RAM into buffer
@@ -1216,6 +1218,8 @@ BAR:    tax
 L89CB:  sta     bar_flag
         jmp     WA8F8
 
+
+/*
 ; ----------------------------------------------------------------
 ; "DESKTOP" Command - start Desktop
 ; ----------------------------------------------------------------
@@ -1248,6 +1252,7 @@ a_are_you_sure:
         .byte   "ARE YOU SURE (Y/N)?", CR, 0
 a_ready: ; XXX this is only used by desktop_helper.s, it should be defined there
         .byte   CR,"READY.", CR, 0
+*/
 
 ; ----------------------------------------------------------------
 ; "DLOAD" Command - load a program from disk
@@ -1459,6 +1464,8 @@ L8B6D:  lda     #3
 ; ----------------------------------------------------------------
 PDIR:   jsr     get_secaddr_and_send_listen
         bcs     L8B6D
+
+
 L8B79:  jsr     UNLSTN
         lda     #$F0
         jsr     listen_or_error
@@ -1550,13 +1557,13 @@ L8C03:  lda     $028D
         jmp     _list
 
 do_detokenize:
-        cmp     #$E9
+        cmp     #last_new_token
         bcs     L8C5F ; token above
         cmp     #$80
         bcc     L8C59 ; below
         bit     $0F
         bmi     L8C55
-        cmp     #$CC
+        cmp     #first_new_token
         bcc     L8C2B ; standard C64 token
         sbc     #$4C
         ldx     #<new_basic_keywords
@@ -2084,6 +2091,21 @@ L8FF9:  sty     $39 ; line number lo
         sbc     $3A
 L900B:  rts
 
+
+ULTIMATE:
+        ldx #0
+:       lda a_ultimate,x
+        beq :+
+        jsr $E716 ; char to screen
+        inx
+        jmp :-
+:       jmp WA8F8
+
+a_ultimate:
+        .byte "THE ULTIMATE IS GREAT!", 13, 0
+
+
+
 ; ----------------------------------------------------------------
 ; "UNPACK" Command - decompress a program
 ; ----------------------------------------------------------------
@@ -2495,3 +2517,13 @@ basic_keywords:
         .byte   "G", 'O' + $80
         .byte   0
 
+.global _set_txtptr_to_start
+_set_txtptr_to_start:
+        clc
+        lda $2b
+        adc #$ff
+        sta $7a
+        lda $2c
+        adc #$ff
+        sta $7b
+        rts

@@ -84,6 +84,9 @@ L805A:  sta     $02,y
         pla ; $ D
         tax
         pla
+
+        jmp     go_basic
+
         cpx     #$7F ; $DC01 value
         beq     L80C4 ; 1988-13 changes this to "bne" to start into BASIC
         cpx     #$DF
