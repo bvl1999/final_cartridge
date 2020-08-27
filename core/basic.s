@@ -214,24 +214,28 @@ new_tokenize:
 L8259:  lda     $0200,x ; read character from direct mode
         bpl     L8265
         cmp     #$FF ; PI
-        beq     L82B6
+        beq     _tkfnd
         inx
         bne     L8259
 L8265:  cmp     #' '
-        beq     L82B6
+        beq     _tkfnd
         sta     $08
         cmp     #'"'
         beq     L82DB
         bit     $0F
-        bvs     L82B6
+        bvs     _tkfnd
         cmp     #'?'
-        bne     L827B
+        bne     _nopr
         lda     #$99 ; PRINT token
-        bne     L82B6
-L827B:  cmp     #'0'
+        bne     _tkfnd
+_nopr:  cmp     #'@'
+        bne     _noat
+        lda     #$D8 ; DOS token
+        bne     _tkfnd
+_noat:  cmp     #'0'
         bcc     L8283
         cmp     #$3C
-        bcc     L82B6
+        bcc     _tkfnd
 L8283:  sty     $71
 ; **** this is the same code as BASIC ROM $A579-$A5AD (end) ****
 
@@ -251,7 +255,6 @@ L8294:  inx
         inc     $23
         ; check current keyword, pointed by $22
 L829B:  lda     $0200,x
-        ;beq     L82B4 ; gideon
         sec
         sbc     ($22),y
         beq     L8294
@@ -262,7 +265,7 @@ L829B:  lda     $0200,x
 L82B4:  ldy     $71
 
 ; **** this is the same code as BASIC ROM $A5C9-$A5F8 (start) ****
-L82B6:  inx
+_tkfnd: inx
         iny
         sta     $01FB,y
         lda     $01FB,y
@@ -278,9 +281,9 @@ L82CB:  sec
         bne     L8259
         sta     $08
 L82D2:  lda     $0200,x
-        beq     L82B6
+        beq     _tkfnd
         cmp     $08
-        beq     L82B6
+        beq     _tkfnd
 L82DB:  iny
         sta     $01FB,y
         inx
