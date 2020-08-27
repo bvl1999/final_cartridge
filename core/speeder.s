@@ -159,7 +159,7 @@ L99D6:  pla
         jmp     _disable_rom_set_01
 
 do_uci_load:
-        jmp     ulti_load
+        jmp     ulti_load ; exits with RTS, continues in persistent.s
 
 new_load2:
         sty     $93
@@ -246,7 +246,7 @@ L9A6A:  jmp     $F5ED ; default SAVE vector
 L9A6D:  jmp     $A7C6 ; interpreter loop
 
 do_uci_save:
-        jmp     ulti_save
+        jmp     ulti_save ; returns with RTS and continues in persistent.s
 
 new_save2:
         lda     FA

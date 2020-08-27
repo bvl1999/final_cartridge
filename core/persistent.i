@@ -29,6 +29,7 @@
 .import _list
 .import _load_ac_indy
 .import _load_FNADR_indy
+.import _new_getin
 .import _new_bsin
 .import _new_bsout
 .import _new_ckin

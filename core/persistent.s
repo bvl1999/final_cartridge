@@ -13,6 +13,7 @@
 ; from printer
 .import new_clrch
 .import new_clall
+.import new_getin
 .import new_bsin
 .import new_bsout
 .import new_ckin
@@ -374,6 +375,10 @@ _new_bsin:
         jsr     _enable_rom
         jmp     new_bsin
 
+.global _new_getin
+_new_getin:
+        jsr     _enable_rom
+        jmp     new_getin
 /*
 .global LDFE0
 LDFE0:

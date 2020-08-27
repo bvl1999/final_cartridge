@@ -11,6 +11,15 @@
 .segment "ultimate"
 .feature labels_without_colons, c_comments
 
+.global new_open2
+.global new_close2
+.global new_ckin2
+.global new_bsin2
+.global new_getin2
+.global ulti_clrchn
+.global ulti_ckout
+.global ulti_chrout
+
 ;
         CMD_IF_CONTROL = $DF1C
         CMD_IF_COMMAND = $DF1D
@@ -39,6 +48,7 @@
         UCI_CMD_CHKIN  = $15
         UCI_CMD_CHKOUT = $16
 
+/*
         OPEN_VECTOR   = $031A
         CLOSE_VECTOR  = $031C
         CHKIN_VECTOR  = $031E
@@ -49,6 +59,7 @@
         GETIN_VECTOR  = $032A
         LOAD_VECTOR   = $0330
         SAVE_VECTOR   = $0332
+*/
 
         STATUS     = $90
         VERIFYFLAG = $93
@@ -66,7 +77,11 @@
         SHOW_SEARCHING          = $F5AF
         SHOW_LOADING            = $F5D2
         SHOW_SAVING             = $F68F
-        FILE_NOT_FOUND_ERROR    = $F704
+;        FILE_NOT_FOUND_ERROR    = $F704
+        FILE_LOOKUP_A           = $F314
+        FILE_LOOKUP_X           = $F30F ; Might be different for JD!
+        GET_FILE_PARAMS         = $F31F ; Might be different for JD!
+        CHKIN_CONTINUED         = $F219 ; Might be different for JD!
 
 
 .macro fc3exit addr
@@ -102,14 +117,14 @@ ulti_load:
             bne ld1
             lda #8 ; missing filename
             sec
-            jmp _disable_rom
+            rts
 
 ld1         lda CMD_IF_COMMAND
             cmp #UCI_IDENTIFIER
             beq ld2
             lda #5 ; device not present error
             sec
-            jmp _disable_rom
+            rts
 
 ld2         ldx SECADDR
             jsr SHOW_SEARCHING
@@ -123,7 +138,7 @@ ld2         ldx SECADDR
             beq ld3 ; all OK when zero
             lda #4  ; File not found error
             sec
-            jmp _disable_rom
+            rts
 
 ld3         jsr SHOW_LOADING
 
@@ -143,15 +158,14 @@ ld3         jsr SHOW_LOADING
             ldx LOADPNTR
             ldy LOADPNTR+1
             clc
-            jmp _disable_rom
+            rts
 
 _verify_err jsr uci_ack ; restores A
             lda #$10
             ora STATUS
             sta STATUS
             clc
-            jmp _disable_rom
-
+            rts
 
 
 ; $FFD8   
@@ -170,14 +184,14 @@ ulti_save:
             bne sv1
             lda #8 ; missing filename
             sec
-            jmp _disable_rom
+            rts
 
 sv1         lda CMD_IF_COMMAND
             cmp #UCI_IDENTIFIER
             beq sv2
             lda #5 ; device not present
             sec
-            jmp _disable_rom
+            rts
 
 sv2         jsr SHOW_SAVING
             ldx #UCI_CMD_SAVE
@@ -197,7 +211,9 @@ sv3         jsr uci_ack
             clc
             rts
 
-/*
+
+; ----------------------------------------------------------------
+new_open2:
 ; $FFC0   
 ; OPEN. Open file. (Must call SETLFS and SETNAM beforehand.)
 ; Input: –
@@ -206,46 +222,96 @@ sv3         jsr uci_ack
 ; Real address: ($031A), $F34A.
 ; 
 
-ultiopen    cmp UCI_DEVICE
+            lda DEVNUM
+            cmp UCI_DEVICE
             beq myopen
-op3         cmp #3
-            beq op2       ;is screen...done.
-op1         rts ; return to original open routine with original flags
+op1         jmp (OPEN_ORIG)
 
-myopen      ldx CMD_IF_COMMAND
-            cpx #UCI_IDENTIFIER
-            bne op3
+myopen      lda CMD_IF_COMMAND
+            cmp #UCI_IDENTIFIER
+            bne error5
+
+            ; The following is an optimized copy of the kernal code at F34A, because
+            ; it is common code, which should always be executed, but it
+            ; cannot be vectored.
+
+            lookup = $F30F
+            ldtnd  = $98
+            la     = $B8
+            sa     = $B9
+            fa     = $BA
+            lat    = $0259
+            sat    = $026D
+            fat    = $0263
+
+            ldx la          ;check file #
+            beq error6      ;is the keyboard -> not input file
+            jsr lookup      ;see if in table
+            beq error2      ;found... -> file open
+            ldx ldtnd       ;logical device table end
+            cpx #10         ;maximum # of open files
+            bcs error1      ;Too many files
+            inc ldtnd       ;new file
+            lda la
+            sta lat,x       ;store logical file #
+            lda sa
+            ora #$60        ;make sa an serial command
+            sta sa
+            sta sat,x       ;store command #
+            lda fa
+            sta fat,x       ;store device #
 
             ldx #UCI_CMD_OPEN
             jsr uci_setup_cmd
             jsr uci_filename ; also executes
             jsr uci_ack
-
-op2         pla ; throw away return address and exit
-            pla
             clc
             rts
 
-; $FFC3   
+error1      lda #1
+            .byte $2c
+error2      lda #2
+            .byte $2c
+error3      lda #3
+            .byte $2c
+error5      lda #5
+            .byte $2c
+error6      lda #6
+            sec
+            rts
+
+; ----------------------------------------------------------------
+new_close2:
+; $FFC3
 ; CLOSE. Close file.
 ; Input: A = Logical number.
 ; Output: –
 ; Used registers: A, X, Y.
 ; Real address: ($031C), $F291.
 ;
+        ; should always exit with RTS!
+            pha
+            jsr FILE_LOOKUP_A
+            beq cl1
+            ; not found, so close was not necessary
+            pla
+            clc
+            rts
 
-ulticlose   cmp UCI_DEVICE
+            ; x is now set to index and stack has original a
+cl1         jsr GET_FILE_PARAMS
+
+            lda DEVNUM
+            cmp UCI_DEVICE
             beq myclose
-cl1         cmp #3
-            beq op2       ;is screen...done
-            rts           ; return to caller with original flags due to cmp #3
+cl2         pla ; restore stack for exit
+            jmp (CLOSE_ORIG)   ; And do the lookup again. ;)
 
-myclose     ldx CMD_IF_COMMAND
-            cpx #UCI_IDENTIFIER
-            bne cl1
+myclose     lda CMD_IF_COMMAND
+            cmp #UCI_IDENTIFIER
+            bne cl2
+            pla ; restore stack, but we don't need a
 
-            pla         ; kill return address
-            pla         ; kill return address
             ldx #UCI_CMD_CLOSE
             jsr uci_setup_cmd
             jsr uci_execute
@@ -253,85 +319,135 @@ myclose     ldx CMD_IF_COMMAND
             clc
             rts
 
-; $FFE4   
-; GETIN. Read byte from default input. (If not keyboard, must call OPEN and CHKIN beforehand.)
-; Input: –
-; Output: A = Byte read.
-; Used registers: A, X, Y.
-; Real address: ($032A), $F13E.
+; ----------------------------------------------------------------
+new_ckin2:
+; $FFC6
+; CHKIN. Define file as default input. (Must call OPEN beforehand.)
+; Input: X = Logical number.
+; Output: –
+; Used registers: A, X.
+; Real address: ($031E), $F20E.
+;
+        ; should always exit with RTS!
+            jsr FILE_LOOKUP_X       ; as copied from stock kernal
+            bne error3              ; as copied from stock kernal
+_cki1       jsr GET_FILE_PARAMS     ; as copied from stock kernal
+            lda DEVNUM
+            cmp UCI_DEVICE
+            beq _my_chkin
+            jmp CHKIN_CONTINUED    ; continue at stock kernal location
 
+_my_chkin   sta DEVFROM
+do_chkin    ldx #UCI_CMD_CHKIN
+            jsr uci_setup_cmd
+            jsr uci_execute
+            clc
+            rts
 
-;getinentry
-;            lda DEVFROM
-;            cmp UCI_DEVICE
-;            beq my_chrin
-;            jmp (origvect_getin)
-
-
-; $FFCF   
+; ----------------------------------------------------------------
+new_bsin2:
+; $FFCF
 ; CHRIN. Read byte from default input (for keyboard, read a line from the screen). (If not keyboard, must call OPEN and CHKIN beforehand.)
 ; Input: –
 ; Output: A = Byte read.
-; Used registers: A, Y. (For serial connections, Y is not modified, so we should not modify it!)
+; Used registers: A, Y.
 ; Real address: ($0324), $F157.
- 
 
-ultichrin   cmp UCI_DEVICE
+        ; should always exit with RTS!
+            lda DEVFROM
+            cmp UCI_DEVICE
             beq my_chrin
-            cmp #3          ;is input from screen?
-            bne cin1        ;no...
-            jmp bn15
-cin1        jmp bn20
+            jmp (CHRIN_ORIG)
 
-my_chrin    lda CMD_IF_CONTROL
+my_chrin    ; is there any data available in the current buffer?
+            lda CMD_IF_CONTROL
             bpl _no_data_avail
+
+            ; read available data and store it on the stack
             lda CMD_IF_RESULT
             pha
+
+            ; a byte was succesfully read. However, was this the last byte?
             lda CMD_IF_CONTROL
-            bmi _ok
+            bmi _ok   ; there is more in the current buffer
+
+            ; end of current buffer. Is this the last buffer?
             and #CMD_STATE_BITS
-            cmp #CMD_STATE_LAST_DATA
-            bne _ok
-            jmp _eof
+            cmp #CMD_STATE_MORE_DATA
+            beq _ok   ; there is a next buffer. So we are fine
+
+            ; No next buffer available, so set EOI
+            lda #$40
+            ora STATUS
+            sta STATUS
+
+            ; pick up the byte we read and leave
 _ok         pla
             clc
             rts ; done!!
 
 _no_data_avail
+            ; Current buffer is empty. Are we in the MORE data state?
             and #CMD_STATE_BITS
-            cmp #CMD_STATE_LAST_DATA
-            beq _end_of_file
+            cmp #CMD_STATE_MORE_DATA
+            bne _read_error
 
             ; Get next block of data
             jsr uci_ack
             jsr uci_wait_busy
             jmp my_chrin
 
-_end_of_file
-            lda #$0D
-            pha
-_eof
-            lda #$40
+_read_error
+            ; No data could be read. We return $0D, and set EOF + Read Error
+            lda #$42
             ora STATUS
             sta STATUS
-            pla
+            lda #$0D
             clc
             rts
 
+new_getin2:
+; $FFE4
+; GETIN. Read byte from default input. (If not keyboard, must call OPEN and CHKIN beforehand.)
+; Input: –
+; Output: A = Byte read.
+; Used registers: A, X, Y.
+; Real address: ($032A), $F13E.
 
-; $FFD2   
-; CHROUT. Write byte to default output. (If not screen, must call OPEN and CHKOUT beforehand.)
-; Input: A = Byte to write.
+getin       lda DEVFROM
+            cmp UCI_DEVICE
+            beq new_bsin2
+            jmp (GETIN_ORIG)
+
+
+; $FFCC
+; CLRCHN. Close default input/output files (for serial bus, send UNTALK and/or UNLISTEN); restore default input/output to keyboard/screen.
+; Input: –
 ; Output: –
-; Used registers: –
-; Real address: ($0326), $F1CA.
-; 
-ultichrout  cmp UCI_DEVICE
-            beq _my_chrout
-            pla
-            jmp ciout ; to serial bus
+; Used registers: A, X.
+; Real address: ($0322), $F333.
+;
+; This is called as a subroutine from FC3 code
+ulti_clrchn:
+            lda DEVNUM
+            cmp UCI_DEVICE
+            beq _my_clrchn
+_clr2       rts
 
-_my_chrout  inc UCI_OUTLEN
+_my_clrchn  lda CMD_IF_COMMAND
+            cmp #UCI_IDENTIFIER
+            bne _clr2
+            jmp uci_abort
+
+ulti_ckout:
+            lda #0
+            sta UCI_OUTLEN
+            ldx #UCI_CMD_CHKOUT
+            clc
+            jmp uci_setup_cmd       ; do not execute command, because we are waiting for data now
+
+ulti_chrout:
+            inc UCI_OUTLEN
             lda UCI_OUTLEN
             beq _breakup_out
 
@@ -344,70 +460,15 @@ _breakup_out
             pha
             jsr uci_execute    ; Execute the complete command, e.g. write the block of data
             jsr uci_ack
-            jsr do_chkout      ; Send a new command to start transmission of the next block
+            jsr ulti_ckout     ; Send a new command to start transmission of the next block
             pla
             tax
             jmp _co1
 
 
-; $FFC6   
-; CHKIN. Define file as default input. (Must call OPEN beforehand.)
-; Input: X = Logical number.
-; Output: –
-; Used registers: A, X.
-; Real address: ($031E), $F20E.
-; 
+.segment "ultimate2"
 
-ultichkin   cmp UCI_DEVICE
-            beq _my_chkin
-            cmp #3
-            beq _jx320       ;is screen...done.
-            jmp jx314
-_jx320      jmp jx320
-
-_my_chkin   sta dfltn
-            ldx #UCI_CMD_CHKIN
-            jsr uci_setup_cmd
-            jsr uci_execute
-            clc
-            rts
-
-; $FFC9   
-; CHKOUT. Define file as default output. (Must call OPEN beforehand.)
-; Input: X = Logical number.
-; Output: –
-; Used registers: A, X.
-; Real address: ($0320), $F250.
-; 
-ultichkout  cmp UCI_DEVICE
-            beq _my_chkout
-            cmp #3
-            beq _ck30       ;is screen...done.
-            jmp ck14
-_ck30       jmp ck30
-
-_my_chkout  sta DEVTO
-do_chkout   lda #0
-            sta UCI_OUTLEN
-            ldx #UCI_CMD_CHKOUT
-            clc
-            jmp uci_setup_cmd       ; do not execute command, because we are waiting for data now
-
-; $FFCC   
-; CLRCHN. Close default input/output files (for serial bus, send UNTALK and/or UNLISTEN); restore default input/output to keyboard/screen.
-; Input: –
-; Output: –
-; Used registers: A, X.
-; Real address: ($0322), $F333.
-; 
-ulticlrchn  cpx UCI_DEVICE
-            beq _my_clrchn
-            jmp unlsn ; if it was not us, it is serial
-_my_clrchn  jmp uci_abort
-
-*/
 ;; UCI
-
 uci_setup_cmd
             lda #UCI_TARGET
             sta CMD_IF_COMMAND

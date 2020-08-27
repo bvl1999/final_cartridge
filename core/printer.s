@@ -11,14 +11,24 @@
 .global set_io_vectors_with_hidden_rom
 .global set_io_vectors
 .global something_with_printer
+.global new_open
+.global new_close
 .global new_ckin
 .global new_ckout
+.global new_getin
 .global new_bsin
 .global new_bsout
 .global new_clall
 .global new_clrch
-.global new_open
-.global new_close
+
+.import new_open2
+.import new_close2
+.import new_ckin2
+.import new_bsin2
+.import new_getin2
+.import ulti_clrchn
+.import ulti_ckout
+.import ulti_chrout
 
 .segment "printer"
 
@@ -180,7 +190,7 @@ hidden_vectors:
         .addr _new_bsin
         .addr _new_bsout
         .addr 0
-        .addr 0;_new_getin
+        .addr _new_getin
         .addr _new_clall
 
 rom_vectors:
@@ -192,7 +202,7 @@ rom_vectors:
         .addr new_bsin2
         .addr new_bsout2
         .addr 0
-        .addr 0;new_getin
+        .addr new_getin2
         .addr new_clall2
 
 ; these routines turn the cartridge ROM on before,
@@ -238,7 +248,12 @@ LA16D:  pla
 
 LA173:  jsr     $F31F ; set file par from table
         lda     FA
-        cmp     #4 ; printer
+        cmp     UCI_DEVICE
+        bne     :+
+        sta     $9A ; sta DEVTO
+        pla     ; consume pha from second line
+        jmp     ulti_ckout ; should exit with RTS
+:       cmp     #4 ; printer
         bne     LA168
         jsr     LA183
         bcs     LA16D
@@ -265,7 +280,10 @@ new_bsout:
 new_bsout2:
         pha
         lda     $9A
-        cmp     #4
+        cmp     UCI_DEVICE
+        bne     :+
+        jmp     ulti_chrout ; char on stack!
+:       cmp     #4
         beq     LA1AD
 LA1A9:  pla
         jmp     $F1CA ; KERNAL BSOUT
@@ -296,6 +314,7 @@ new_clall2:
         lda     #0
         sta     $98
 new_clrch2:
+        jsr     ulti_clrchn
         lda     #4
         ldx     #3
         cmp     $9A
@@ -735,42 +754,22 @@ LA4E6:  lda     $DD0C
         jsr     LA26C
 LA4F0:  rts
 ; ----------------------------------------------------------------
-
-;        .byte   $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF
-;        .byte   $FF,$FF,$FF,$FF,$FF,$FF,$FF
-
-; ----------------------------------------------------------------
 new_open:
         jsr new_open2
         jmp _disable_rom
 
-new_open2:
-        ; should always exit with RTS!
-        jmp (OPEN_ORIG)
-
-; ----------------------------------------------------------------
 new_close:
         jsr new_close2
         jmp _disable_rom
 
-new_close2:
-        ; should always exit with RTS!
-        jmp (CLOSE_ORIG)
-
-; ----------------------------------------------------------------
 new_ckin:
         jsr new_ckin2
         jmp _disable_rom
 
-new_ckin2:
-        ; should always exit with RTS!
-        jmp (CHKIN_ORIG)
-
-; ----------------------------------------------------------------
 new_bsin:
         jsr new_bsin2
         jmp _disable_rom
 
-new_bsin2:
-        ; should always exit with RTS!
-        jmp (CHRIN_ORIG)
+new_getin:
+        jsr new_getin2
+        jmp _disable_rom
