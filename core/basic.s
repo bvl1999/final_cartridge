@@ -1516,6 +1516,12 @@ set_filename:
         jsr     SETLFS
         jsr     $E206 ; RTS if end of line
         jsr     _get_filename
+        ldy     #0
+        jsr     _load_FNADR_indy
+        cmp     #$24 ; directory? load at current address by setting SA to 0
+        bne     :+
+        sty     SA
+:
         rts ; XXX jsr/rts -> jmp
 
 set_colon_asterisk:

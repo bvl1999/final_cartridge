@@ -20,6 +20,11 @@
 .global ulti_ckout
 .global ulti_chrout
 
+.import print_searching
+.import print_loading
+.import print_saving
+
+
 ;
         CMD_IF_CONTROL = $DF1C
         CMD_IF_COMMAND = $DF1D
@@ -74,9 +79,6 @@
         SAVEADDR   = $C1
         SAVEEND    = $AE
 
-        SHOW_SEARCHING          = $F5AF
-        SHOW_LOADING            = $F5D2
-        SHOW_SAVING             = $F68F
 ;        FILE_NOT_FOUND_ERROR    = $F704
         FILE_LOOKUP_A           = $F314
         FILE_LOOKUP_X           = $F30F ; Might be different for JD!
@@ -126,13 +128,13 @@ ld1         lda CMD_IF_COMMAND
             sec
             rts
 
-ld2         ldx SECADDR
-            jsr SHOW_SEARCHING
+ld2         jsr print_searching
             ldx #UCI_CMD_LOADSU
             jsr uci_setup_cmd
             ldy #LOADADDR
             jsr uci_setup_range
-            jsr uci_filename ; also executes
+            jsr uci_filename
+            jsr uci_execute
             lda CMD_IF_STATUS
             jsr uci_ack ; restores A
             beq ld3 ; all OK when zero
@@ -140,7 +142,7 @@ ld2         ldx SECADDR
             sec
             rts
 
-ld3         jsr SHOW_LOADING
+ld3         jsr print_loading
 
             ldx #UCI_CMD_LOADEX
             jsr uci_setup_cmd
@@ -193,12 +195,13 @@ sv1         lda CMD_IF_COMMAND
             sec
             rts
 
-sv2         jsr SHOW_SAVING
+sv2         jsr print_saving
             ldx #UCI_CMD_SAVE
             jsr uci_setup_cmd
             ldy #SAVEADDR
             jsr uci_setup_range
             jsr uci_filename
+            jsr uci_execute_from_ram
             lda CMD_IF_STATUS
             beq sv3 ; all OK when zero
 
@@ -263,7 +266,8 @@ myopen      lda CMD_IF_COMMAND
 
             ldx #UCI_CMD_OPEN
             jsr uci_setup_cmd
-            jsr uci_filename ; also executes
+            jsr uci_filename
+            jsr uci_execute
             jsr uci_ack
             clc
             rts
@@ -344,6 +348,8 @@ do_chkin    ldx #UCI_CMD_CHKIN
             clc
             rts
 
+.segment "ultimate2"
+
 ; ----------------------------------------------------------------
 new_bsin2:
 ; $FFCF
@@ -420,6 +426,7 @@ getin       lda DEVFROM
             jmp (GETIN_ORIG)
 
 
+
 ; $FFCC
 ; CLRCHN. Close default input/output files (for serial bus, send UNTALK and/or UNLISTEN); restore default input/output to keyboard/screen.
 ; Input: –
@@ -446,6 +453,7 @@ ulti_ckout:
             clc
             jmp uci_setup_cmd       ; do not execute command, because we are waiting for data now
 
+
 ulti_chrout:
             inc UCI_OUTLEN
             lda UCI_OUTLEN
@@ -466,7 +474,6 @@ _breakup_out
             jmp _co1
 
 
-.segment "ultimate2"
 
 ;; UCI
 uci_setup_cmd
@@ -494,12 +501,12 @@ uci_filename
             lda NAMELEN
             beq _fn2
             ldy #$00
-_fn1        lda (NAMEPTR),y
+_fn1        jsr _load_FNADR_indy
             sta CMD_IF_COMMAND
             iny
             cpy NAMELEN
             bne _fn1
-_fn2        jmp uci_execute
+_fn2        rts
 
 uci_execute lda #CMD_PUSH_CMD
             sta CMD_IF_CONTROL
@@ -544,3 +551,30 @@ uci_clear_error
             lda #CMD_ERROR
             sta CMD_IF_CONTROL
             rts
+
+uci_execute_from_ram
+            ldx #<(uci_exec_ram_end - uci_exec_ram - 1)
+_cpy        lda uci_exec_ram,x
+            sta $0140,x
+            dex
+            bpl _cpy
+            jmp $0140
+
+uci_exec_ram:
+            lda $01
+            pha
+            sei
+            lda #$35 ; cannot use $34 here, for obvious reasons... I/O?
+            sta $01
+            lda #CMD_PUSH_CMD
+            sta CMD_IF_CONTROL
+_wbr1       lda CMD_IF_CONTROL
+            and #CMD_STATE_BITS
+            cmp #CMD_STATE_BUSY
+            beq _wbr1
+            pla
+            sta $01
+            cli
+            rts
+uci_exec_ram_end:
+

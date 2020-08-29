@@ -8,6 +8,10 @@
 
 .global new_load
 .global new_save
+.global print_searching
+.global print_loading
+.global print_saving
+
 .import ulti_load
 .import ulti_save
 
@@ -1082,7 +1086,7 @@ LA773:  lda     ($B2),y
         bne     LA773
         rts
 
-LA77E:  jsr     LA7B1
+LA77E:  jsr     print_saving
         bmi     LA796
         rts
 
@@ -1111,7 +1115,8 @@ print_loading:
         beq     LA7B3
         ldy     #$59 ; "VERIFYING"
         .byte   $2C
-LA7B1:  ldy     #$51 ; "SAVING"
+print_saving:
+        ldy     #$51 ; "SAVING"
 LA7B3:  bit     $9D
         bpl     LA7C4
 print_kernal_string:
