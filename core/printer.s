@@ -21,7 +21,7 @@
 .global new_clall
 .global new_clrch
 
-.global new_ckout2
+.global ckout_known_fasa
 .global new_bsout2
 
 .import new_open2

@@ -53,6 +53,9 @@
 .import set_io_vectors_with_hidden_rom
 .import something_with_printer
 
+; from UCI
+.import new_clrch2
+
 ; from wrappers
 .import WA3BF
 .import WA49F
@@ -1223,6 +1226,7 @@ MON:    bne     L89BC
 ; ----------------------------------------------------------------
 ; "BAR" Command - enable/disable pull-down menu
 ; ----------------------------------------------------------------
+/*
 BAR:    tax
         lda     #0 ; bar off
         cpx     #$CC
@@ -1230,7 +1234,7 @@ BAR:    tax
         lda     #$80 ; bar on
 L89CB:  sta     bar_flag
         jmp     WA8F8
-
+*/
 
 /*
 ; ----------------------------------------------------------------
@@ -1312,15 +1316,31 @@ L8A35:  jsr     L8986
 DOS:    cmp     #'"'
         beq     L8A5D ; DOS with a command
 L8A47:  jsr     listen_6F_or_error
-        jsr     UNLSTN
+        jsr     new_clrch2 ; UNLSTN
         jsr     command_channel_talk
         jsr     print_line_from_drive
 L8A53:  rts
+
+_invalid:
+        jmp     WAF08
 
 L8A54:  and     #$0F
         sta     FA
         bne     L8A5D
         jmp     L852C
+
+_ten_or_more:
+        lda     #10
+        sta     FA
+        jsr     _CHRGET
+        cmp     #'0'
+        bcc     _invalid
+        cmp     #'6'
+        bpl     _invalid
+        and     #$0F
+        clc
+        adc     FA
+        sta     FA
 
 L8A5D:  jsr     _CHRGET
         beq     L8A47
@@ -1332,6 +1352,8 @@ L8A69:  cmp     #'8'
         beq     L8A54
         cmp     #'9'
         beq     L8A54
+        cmp     #'1'
+        beq     _ten_or_more
         jsr     listen_6F_or_error
 
 send_drive_command:
@@ -1536,7 +1558,7 @@ set_drive:
         bcc     L8BD1 ; device number 9 or above
 L8BCE:  sta     FA
 L8BD0:  rts
-L8BD1:  lda     #9
+L8BD1:  lda     #15
         cmp     FA
         bcs     L8BD0 ; RTS
         lda     #8 ; set drive 8

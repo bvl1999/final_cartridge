@@ -19,6 +19,7 @@
 .global ulti_clrchn
 .global ulti_ckout
 .global ulti_chrout
+.global ckin_known_fasa
 
 .import hide
 .import unhide
@@ -359,10 +360,16 @@ new_ckin2:
             jsr FILE_LOOKUP_X       ; as copied from stock kernal
             bne error3              ; as copied from stock kernal
 _cki1       jsr GET_FILE_PARAMS     ; as copied from stock kernal
+
+ckin_known_fasa:
             lda DEVNUM
+            beq _ckin_ok
             cmp UCI_DEVICE
             beq _my_chkin
+            cmp #4
+            bcs _ckin_iec
 
+            ; non-IEC, i.e. device 1, 2, or 3
             lda #>(CHKIN_CONTINUED-1)
             pha
             lda #<(CHKIN_CONTINUED-1)
@@ -371,11 +378,33 @@ _cki1       jsr GET_FILE_PARAMS     ; as copied from stock kernal
             ; Continue to the original Kernal code with ROM disabled. We do this because
             ; the original CKIN function may call upon CLRCHN and BSOUT, which are vectored.
             ; Consequence: This routine MAY NOT BE CALLED FROM INSIDE THE ROM!
+            ; Fix: for all IEC devices, the following code has been copied from the kernal ROM,
+            ; so that this function can be called from inside the ROM (for IEC and UCI only).
+
+_ckin_iec   tax ; save A for later
+            jsr TALK
+            lda SA
+            bpl :+
+            jsr $EDCC   ; release ATN and wait for clock
+            jmp :++
+:
+            jsr TKSA    ; send talk secondary
+:
+            txa
+            bit ST
+            bpl _ckin_ok
+            lda #5      ; device not present
+            sec
+            rts
+
 
 _my_chkin   sta DEVFROM
 do_chkin    ldx #UCI_CMD_CHKIN
             jsr uci_setup_cmd
             jsr uci_execute
+            clc
+            rts
+_ckin_ok    sta DEVFROM
             clc
             rts
 

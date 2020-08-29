@@ -2,6 +2,7 @@
 ; Common drive code
 ; ----------------------------------------------------------------
 ; The BASIC extension and fast format call into this.
+.feature c_comments
 
 .include "kernal.i"
 
@@ -22,45 +23,50 @@
 .global listen_or_error
 .global device_not_present
 
+.import ckout_known_fasa
+.import ckin_known_fasa
+.import new_bsin2
+.import new_bsout2
+.import new_clrch2
+
 .segment "drive"
 
+; -----------------------------------------
 print_line_from_drive:
-        jsr     IECIN
+        jsr     new_bsin2 ; new_bsin2 ; IECIN
         jsr     $E716 ; output character to the screen
         cmp     #CR
         bne     print_line_from_drive
-        jmp     UNTALK
+        jmp     new_clrch2; new_clrch2 ; UNTALK
 
 check_iec_error:
         jsr     command_channel_talk
-        jsr     IECIN
+        jsr     new_bsin2 ; IECIN
         tay
-L8124:  jsr     IECIN
+L8124:  jsr     new_bsin2 ; IECIN
         cmp     #CR ; skip message
         bne     L8124
-        jsr     UNTALK
+        tay
+        jsr     new_clrch2 ; UNTALK
         cpy     #'0'
         rts
 
 cmd_channel_listen:
         lda     #$6F
 listen_second:
-        pha
+        sta     SA
         jsr     set_drive
-        jsr     LISTEN
-        pla
-        jsr     SECOND
+        jsr     ckout_known_fasa
         lda     ST
         rts
 
 command_channel_talk:
         lda     #$6F
 talk_second:
-        pha
+        sta     SA
         jsr     set_drive
-        jsr     TALK
-        pla
-        jmp     TKSA
+        jsr     ckin_known_fasa
+        rts
 
 m_w_and_m_e:
         sta     $C3
@@ -69,13 +75,13 @@ m_w_and_m_e:
 L8154:  lda     #'W'
         jsr     send_m_dash
         tya
-        jsr     IECOUT
+        jsr     new_bsout2 ; IECOUT
         txa
-        jsr     IECOUT
+        jsr     new_bsout2 ; IECOUT
         lda     #' '
-        jsr     IECOUT
+        jsr     new_bsout2 ; IECOUT
 L8166:  lda     ($C3),y
-        jsr     IECOUT
+        jsr     new_bsout2 ; IECOUT
         iny
         tya
         and     #$1F
@@ -92,11 +98,11 @@ send_m_dash:
         pha
         jsr     listen_6F_or_error
         lda     #'M'
-        jsr     IECOUT
+        jsr     new_bsout2 ; IECOUT
         lda     #'-'
-        jsr     IECOUT
+        jsr     new_bsout2 ; IECOUT
         pla
-        jmp     IECOUT
+        jmp     new_bsout2 ; IECOUT
 
 listen_6F_or_error:
         lda     #$6F

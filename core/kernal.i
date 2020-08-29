@@ -21,12 +21,14 @@ MEMTOP          := $FF99
 MEMBOT          := $FF9C
 SCNKEY          := $FF9F
 SETTMO          := $FFA2
+
 IECIN           := $FFA5
 IECOUT          := $FFA8
 UNTALK          := $FFAB
 UNLSTN          := $FFAE
 LISTEN          := $FFB1
 TALK            := $FFB4
+
 READST          := $FFB7
 SETLFS          := $FFBA
 SETNAM          := $FFBD
