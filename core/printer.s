@@ -304,13 +304,13 @@ _ckout_iec:
         pla     ; consume PHA from second line of this function
         lda     FA
         tax
-        jsr     $ED0C ; LISTN
+        jsr     LISTEN
         lda     SA
         bpl     :+
         jsr     $EDBE ; release ATN
         bne     :++
 :
-        jsr     $EDB9 ; send SA
+        jsr     SECOND
         txa
 :
         bit     ST   ;DID HE LISTEN?

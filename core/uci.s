@@ -508,10 +508,23 @@ _my_clrchn  lda CMD_IF_COMMAND
 ulti_ckout:
             lda #0
             sta UCI_OUTLEN
-            ldx #UCI_CMD_CHKOUT
-            clc
-            jmp uci_setup_cmd    ; do not execute command, because we are waiting for data now
+            sta STATUS
 
+            lda CMD_IF_COMMAND
+            cmp #UCI_IDENTIFIER
+            beq :+
+
+            lda #5
+            sta $0403
+            sec
+            ror STATUS
+            rts
+
+:           ldx #UCI_CMD_CHKOUT
+            jsr uci_setup_cmd    ; do not execute command, because we are waiting for data now
+            lda #0
+            clc
+            rts
 
 ulti_chrout:
             inc UCI_OUTLEN

@@ -55,6 +55,7 @@
 
 ; from UCI
 .import new_clrch2
+.import new_bsout2
 
 ; from wrappers
 .import WA3BF
@@ -558,7 +559,7 @@ L84AB:  dex
         bne     L845E
 L84C0:  lda     #$E0
         jsr     talk_second
-        jmp     UNLSTN
+        jmp     new_clrch2 ; UNLSTN
 
 talk_60:
         lda     $9A
@@ -566,7 +567,7 @@ talk_60:
         beq     L84DB ; output to screen
         bit     $DD0C
         bmi     L84DB ; centronics printer disabled
-        jsr     UNLSTN
+        jsr     new_clrch2 ; UNLSTN
         lda     #$60
         jsr     talk_second
 L84DB:  rts
@@ -1364,7 +1365,7 @@ send_drive_command:
         cmp     #'F' ; drive command "F": fast format
         bne     L8A84
         jsr     fast_format
-L8A84:  jmp     L8BE3
+L8A84:  jmp     send_drive_cmd
 
 ; drive command "D": change disk name
 change_disk_name:
@@ -1372,7 +1373,7 @@ change_disk_name:
         lda     (TXTPTR),y
         cmp     #$3A
         bne     L8A84
-        jsr     UNLSTN
+        jsr     new_clrch2 ; UNLSTN
         jsr     init_read_disk_name
         beq     L8A97
         rts
@@ -1384,7 +1385,7 @@ L8A9E:  jsr     L8BDB
         beq     L8AB2
         cmp     #$2C
         beq     L8AB2
-        jsr     IECOUT
+        jsr     new_bsout2 ; IECOUT
         iny
         cpy     #$12
         bne     L8A9E
@@ -1395,7 +1396,7 @@ L8AB2:  pha
 L8AB5:  cpy     #$12
         beq     L8AC1
         lda     #$A0
-        jsr     IECOUT
+        jsr     new_bsout2 ; IECOUT
         iny
         bne     L8AB5
 L8AC1:  pla
@@ -1404,13 +1405,13 @@ L8AC1:  pla
         cmp     #','
         bne     L8ADF
         lda     #$A0
-        jsr     IECOUT
-        jsr     IECOUT
+        jsr     new_bsout2 ; IECOUT
+        jsr     new_bsout2 ; IECOUT
         iny
         ldx     #4
 L8AD3:  jsr     L8BDB
         beq     L8ADF
-        jsr     IECOUT
+        jsr     new_bsout2 ; IECOUT
         iny
         dex
         bpl     L8AD3
@@ -1418,8 +1419,8 @@ L8ADF:  jsr     L8BF0
         jsr     init_write_bam
         jsr     cmd_channel_listen
         lda     #'I'
-        jsr     IECOUT
-        jmp     UNLSTN
+        jsr     new_bsout2 ; IECOUT
+        jmp     new_clrch2 ; UNLSTN
 
 ; ----------------------------------------------------------------
 ; common code for PLIST/PDIR
@@ -1446,7 +1447,7 @@ send_printer_listen:
 L8B13:  and     #$0F
         ora     #$60
         sta     SA
-L8B19:  jsr     UNLSTN
+L8B19:  jsr     new_clrch2 ; UNLSTN
         lda     #0
         sta     ST
         lda     #4
@@ -1501,18 +1502,18 @@ PDIR:   jsr     get_secaddr_and_send_listen
         bcs     L8B6D
 
 
-L8B79:  jsr     UNLSTN
+L8B79:  jsr     new_clrch2 ; UNLSTN
         lda     #$F0
         jsr     listen_or_error
         lda     $9A
         cmp     #4
         bne     :+
         lda     #$24
-        jsr     IECOUT
-        jsr     UNLSTN
+        jsr     new_bsout2 ; IECOUT
+        jsr     new_clrch2 ; UNLSTN
         jmp     L8B95
 
-:       jsr     L8BE3
+:       jsr     send_drive_cmd
 L8B95:  jsr     print_dir
         jsr     set_io_vectors
         jsr     CLRCH
@@ -1558,20 +1559,22 @@ set_drive:
         bcc     L8BD1 ; device number 9 or above
 L8BCE:  sta     FA
 L8BD0:  rts
-L8BD1:  lda     #15
-        cmp     FA
-        bcs     L8BD0 ; RTS
+L8BD1:  lda     FA
+        cmp     #16
+        bcc     L8BD0 ; RTS
         lda     #8 ; set drive 8
         bne     L8BCE
+
 L8BDB:  jsr     _lda_TXTPTR_indy
         beq     L8BE2
         cmp     #'"'
 L8BE2:  rts
 
-L8BE3:  ldy     #0
+send_drive_cmd:
+        ldy     #0
 L8BE5:  jsr     L8BDB
         beq     L8BF0
-        jsr     IECOUT
+        jsr     new_bsout2 ; IECOUT
         iny
         bne     L8BE5
 L8BF0:  cmp     #'"'
@@ -1583,7 +1586,7 @@ L8BF5:  tya
         sta     TXTPTR
         bcc     L8BFF
         inc     TXTPTR + 1
-L8BFF:  jmp     UNLSTN
+L8BFF:  jmp     new_clrch2 ; UNLSTN
 
 ; ----------------------------------------------------------------
 ; Detokenize: Decode a BASIC token to a keyword
