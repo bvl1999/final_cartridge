@@ -337,8 +337,7 @@ _new_tokenize:
 .global _new_ckout
 _new_ckout:
         jsr     _enable_rom
-        jsr     new_ckout
-        jmp     _disable_rom
+        jmp     new_ckout
 
 .global _new_bsout
 _new_bsout:

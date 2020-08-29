@@ -20,6 +20,8 @@
 .global ulti_ckout
 .global ulti_chrout
 
+.import hide
+.import unhide
 .import print_searching
 .import print_loading
 .import print_saving
@@ -224,20 +226,6 @@ new_open2:
 ; Used registers: A, X, Y.
 ; Real address: ($031A), $F34A.
 ; 
-
-            lda DEVNUM
-            cmp UCI_DEVICE
-            beq myopen
-op1         jmp (OPEN_ORIG)
-
-myopen      lda CMD_IF_COMMAND
-            cmp #UCI_IDENTIFIER
-            bne error5
-
-            ; The following is an optimized copy of the kernal code at F34A, because
-            ; it is common code, which should always be executed, but it
-            ; cannot be vectored.
-
             lookup = $F30F
             ldtnd  = $98
             la     = $B8
@@ -249,6 +237,37 @@ myopen      lda CMD_IF_COMMAND
 
             ldx la          ;check file #
             beq error6      ;is the keyboard -> not input file
+
+            lda DEVNUM
+            cmp UCI_DEVICE
+            beq myopen
+
+op1         ; The OPEN_ORIG function may use CLRCHN and BSOUT. Secondly, since it needs to access the file name, the rom should also be turned off.
+            ; For this reason, we simply exit the FC3 ROM here and call the original open function from outside of the ROM.
+            ; NOTE: THIS IS ONLY ALLOWED IF THE OPEN FUNCTION IS NOT CALLED FROM WITHIN THE ROM ITSELF. The RTS at the end of the
+            ; OPEN_ORIG function brings us back to the orignal called with the ROM off.. so it cannot be part of the ROM itself.
+            ;
+            ; Note, that if open were to be called from the ROM, a copy of the kernal 'OPEN' routine must be implemented, with all the diversity
+            ; of paths; including RS232 support and all.
+            ;
+            ; Because we can only be called from outside of the rom, we MUST have entered here through persistent jump. Thus the vectors are for
+            ; hidden ROM, and must stay that way. No need to set new vectors.
+            lda OPEN_ORIG+1
+            pha
+            lda OPEN_ORIG
+            sec
+            sbc #1
+            pha
+            jmp _disable_rom
+
+myopen      lda CMD_IF_COMMAND
+            cmp #UCI_IDENTIFIER
+            bne error5
+
+            ; The following is an optimized copy of the kernal code at F34A, because
+            ; it is common code, which should always be executed, but it
+            ; cannot be vectored.
+
             jsr lookup      ;see if in table
             beq error2      ;found... -> file open
             ldx ldtnd       ;logical device table end
@@ -309,19 +328,23 @@ cl1         jsr GET_FILE_PARAMS
             cmp UCI_DEVICE
             beq myclose
 cl2         pla ; restore stack for exit
+
             jmp (CLOSE_ORIG)   ; And do the lookup again. ;)
+            ; Note that we are jumping to CLOSE_ORIG with ROM on.
+            ; This is not a problem, as the RAM is not queried for the filename; neither does it jump to CLRCHN or BSOUT to print an error.
+            ; We will return in the rom; as RTS brings us to new_close, which then jumps to _disable_rom.
 
 myclose     lda CMD_IF_COMMAND
             cmp #UCI_IDENTIFIER
             bne cl2
-            pla ; restore stack, but we don't need a
+            pla ; restore stack, but we don't need A
 
             ldx #UCI_CMD_CLOSE
             jsr uci_setup_cmd
             jsr uci_execute
             jsr uci_ack
             clc
-            rts
+            rts ; go to _disable_rom in new_close.
 
 ; ----------------------------------------------------------------
 new_ckin2:
@@ -339,7 +362,15 @@ _cki1       jsr GET_FILE_PARAMS     ; as copied from stock kernal
             lda DEVNUM
             cmp UCI_DEVICE
             beq _my_chkin
-            jmp CHKIN_CONTINUED    ; continue at stock kernal location
+
+            lda #>(CHKIN_CONTINUED-1)
+            pha
+            lda #<(CHKIN_CONTINUED-1)
+            pha
+            jmp _disable_rom
+            ; Continue to the original Kernal code with ROM disabled. We do this because
+            ; the original CKIN function may call upon CLRCHN and BSOUT, which are vectored.
+            ; Consequence: This routine MAY NOT BE CALLED FROM INSIDE THE ROM!
 
 _my_chkin   sta DEVFROM
 do_chkin    ldx #UCI_CMD_CHKIN
@@ -363,7 +394,7 @@ new_bsin2:
             lda DEVFROM
             cmp UCI_DEVICE
             beq my_chrin
-            jmp (CHRIN_ORIG)
+            jmp (CHRIN_ORIG) ; runs with the ROM on.. which is valid. its RTS will bring us to new_bsin; which performs _disable_rom
 
 my_chrin    ; is there any data available in the current buffer?
             lda CMD_IF_CONTROL
@@ -423,8 +454,7 @@ new_getin2:
 getin       lda DEVFROM
             cmp UCI_DEVICE
             beq new_bsin2
-            jmp (GETIN_ORIG)
-
+            jmp (GETIN_ORIG) ; runs with the ROM on, which should be OK. It's RTS will bring us to _disable_rom
 
 
 ; $FFCC
@@ -444,14 +474,14 @@ _clr2       rts
 _my_clrchn  lda CMD_IF_COMMAND
             cmp #UCI_IDENTIFIER
             bne _clr2
-            jmp uci_abort
+            jmp uci_abort ; will handle both cases of pending command and pending data state
 
 ulti_ckout:
             lda #0
             sta UCI_OUTLEN
             ldx #UCI_CMD_CHKOUT
             clc
-            jmp uci_setup_cmd       ; do not execute command, because we are waiting for data now
+            jmp uci_setup_cmd    ; do not execute command, because we are waiting for data now
 
 
 ulti_chrout:
@@ -477,6 +507,8 @@ _breakup_out
 
 ;; UCI
 uci_setup_cmd
+            sec
+            ror UCI_PENDING_CMD
             lda #UCI_TARGET
             sta CMD_IF_COMMAND
             stx CMD_IF_COMMAND
@@ -510,7 +542,8 @@ _fn2        rts
 
 uci_execute lda #CMD_PUSH_CMD
             sta CMD_IF_CONTROL
-
+            lda #0
+            sta UCI_PENDING_CMD
 uci_wait_busy
 _wb1        lda CMD_IF_CONTROL
             and #CMD_STATE_BITS
@@ -530,16 +563,19 @@ _ack1       lda CMD_IF_CONTROL
 
 uci_abort   lda CMD_IF_CONTROL
             and #CMD_STATE_DATA
-            bne _abrt1
-            ; Not in data state, but may be in command state
-            ; So send command, even if it may be an empty command
-            lda #CMD_PUSH_CMD
+            beq _abrt1 ; NOT in Data state
+            ; Perform Abort of current command
+            lda #CMD_ABORT
             sta CMD_IF_CONTROL
-            jsr uci_wait_busy
-            jmp uci_ack
-_abrt1      lda #CMD_ABORT
-            sta CMD_IF_CONTROL
-            jmp uci_wait_abort
+            jsr uci_wait_abort
+            rts
+_abrt1      ; Not in data state, but may be in command state
+            bit UCI_PENDING_CMD
+            bpl _abrt2 ; Bit 7 not set, no pending command
+            jsr uci_execute
+            jsr uci_ack
+_abrt2      rts
+
 
 uci_wait_abort
 _wa1        lda CMD_IF_CONTROL
@@ -566,6 +602,8 @@ uci_exec_ram:
             sei
             lda #$35 ; cannot use $34 here, for obvious reasons... I/O?
             sta $01
+            lda #0
+            sta UCI_PENDING_CMD
             lda #CMD_PUSH_CMD
             sta CMD_IF_CONTROL
 _wbr1       lda CMD_IF_CONTROL
@@ -578,3 +616,43 @@ _wbr1       lda CMD_IF_CONTROL
             rts
 uci_exec_ram_end:
 
+
+/* ROM NESTING RESEARCH:
+OPEN
+Adds the currently set LFN to the logical file table and sends the filename if set.
+In the process of modifying the logical file table, error 1, 2, and 6 can occur. In this case, CLRCHN ($ffcc) will be called
+Also, when bit 6 of $9D is set, I/O error will be printed, using BSOUT ($ffd2)
+Later on the serial bus, error 5 (device not present) may occur, which will in turn again call the same subfunctions.
+Eventually all paths lead to RTS, as far as can be seen.
+
+CLOSE
+In case of a drive, it sends Listen, /Ex and Unlisten, clears C and returns. Status possibly gets set when a serial timeout occurs,
+but errors are not directly generated.
+
+CKIN
+In case of a drive, it sends a TALK + SA over the serial bus.
+May end in error 3 (file not open), or Error 5 (device not present). See Open. It always returns with RTS.
+Interestingly, due to a bug, Error 5 does not occur when another device is present on the bus. And endless loop is the result.
+
+CKOUT
+In case of a drive, it sends LISTEN + SA over the serial bus
+May end in error 3 (file not open), or Error 5 (device not present). See Open. It always returns with RTS.
+
+BSIN
+If the status is non-zero, it produces a carriage return. If status is zero, it takes a byte from the serial bus.
+If an error occurs, Bit 1 is set of the status. Interestinly, the byte returned is not $0D (CR), but the byte that is left in the
+accumulator after setting the IEC I/O lines high.  This function always returns with RTS.
+
+BSOUT
+Function always returns with RTS. It will set the status byte when a framing error or such occurs on the serial bus.
+
+CLRCHN
+If the current output channel is a drive, it sends the last buffered byte with EOI, and then unlisten.
+If the current input channel is a drive, it sends untalk.  As we know, the low level serial I/O functions do not all other high level
+routines; they do not jump to ERRORx. They simply set the status.
+
+
+Summary: When jumping to the OPEN function, or the continuation of it in the kernal space, or the functions CKIN and CKOUT,
+the ROM needs to be turned off. The function CANNOT be called from inside of the FC3 ROM!
+
+*/

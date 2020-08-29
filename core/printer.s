@@ -21,6 +21,9 @@
 .global new_clall
 .global new_clrch
 
+.global new_ckout2
+.global new_bsout2
+
 .import new_open2
 .import new_close2
 .import new_ckin2
@@ -29,6 +32,7 @@
 .import ulti_clrchn
 .import ulti_ckout
 .import ulti_chrout
+
 
 .segment "printer"
 
@@ -197,7 +201,7 @@ rom_vectors:
         .addr new_open2
         .addr new_close2
         .addr new_ckin2
-        .addr new_ckout
+        .addr new_ckout2
         .addr new_clrch2
         .addr new_bsin2
         .addr new_bsout2
@@ -208,6 +212,8 @@ rom_vectors:
 ; these routines turn the cartridge ROM on before,
 ; and turn it back off afterwards
 set_io_vectors_with_hidden_rom2:
+        tya
+        pha
         ldy     #18
 :       lda     hidden_vectors+1,y
         beq     :+
@@ -217,10 +223,15 @@ set_io_vectors_with_hidden_rom2:
 :       dey
         dey
         bpl     :--
+;        sty     FC3_HIDDEN ; FF
+        pla
+        tay
         rts
 
 ; these routines assume the cartridge ROM is mapped
 set_io_vectors2:
+        tya
+        pha
         ldy     #18
 :       lda     rom_vectors+1,y
         beq     :+
@@ -230,34 +241,87 @@ set_io_vectors2:
 :       dey
         dey
         bpl     :--
+;        iny
+;        sty     FC3_HIDDEN ; 00
+        pla
+        tay
         rts
 
 ; ----------------------------------------------------------------
 new_ckout:
+        jsr     new_ckout2
+        jmp     _disable_rom
+
+        ; Do not call this function for devices that may not be present.
+new_ckout2:
         txa
         pha
         jsr     $F30F ; find LA
         beq     LA173
-LA168:  pla
-        tax
-        jmp     $F250 ; KERNAL CKOUT
 
-LA16D:  pla
-        lda     #4
-        jmp     $F279 ; set output to IEC bus
+LA168:  ; Function shall not be wrongly called from within the ROM. CKOUT on a file that is not open is
+        ; a programming error. Therefore we can safely exit with the ROM off, even if this function is called
+        ; from within the ROM
+        ;
+        ; $F250 ; KERNAL CKOUT -> may fall through to clrch
+        pla
+        tax
+        lda     #>($F250 - 1)
+        pha
+        lda     #<($F250 - 1)
+        pha
+        jmp     _disable_rom
 
 LA173:  jsr     $F31F ; set file par from table
         lda     FA
+        beq     LA168 ; keyboard? will fail again eventually in the original ROM with error 7
+
+        ; assume that we will be able to set the output - prestore. Fix if error
+_known:
+        sta     $9A ; sta DEVTO
         cmp     UCI_DEVICE
         bne     :+
-        sta     $9A ; sta DEVTO
-        pla     ; consume pha from second line
+        pla     ; consume PHA from second line of this function
         jmp     ulti_ckout ; should exit with RTS
+
 :       cmp     #4 ; printer
-        bne     LA168
+        beq     _printer
+        bcs     _ckout_iec ;LA168
+
+_printer:
         jsr     LA183
-        bcs     LA16D
-        pla
+        bcs     _ckout_iec
+        pla     ; consume PHA from second line of this function
+        rts
+
+ckout_known_fasa:
+        pha
+        jmp     _known
+
+; Our own bit of code to perform the ckout on iec; which will not call BSOUT on error, but simply return an error code. Also we will call our own
+; clrchn function.
+_ckout_iec:
+        pla     ; consume PHA from second line of this function
+        lda     FA
+        tax
+        jsr     $ED0C ; LISTN
+        lda     SA
+        bpl     :+
+        jsr     $EDBE ; release ATN
+        bne     :++
+:
+        jsr     $EDB9 ; send SA
+        txa
+:
+        bit     ST   ;DID HE LISTEN?
+        bpl     :+
+
+        jsr     new_clrch2 ; local
+        lda     #5
+        sec
+        rts
+:
+        clc
         rts
 
 LA183:  jsr     LA09F
@@ -273,6 +337,7 @@ LA183:  jsr     LA09F
         clc
 LA19B:  rts
 
+; ----------------------------------------------------------------
 new_bsout:
         jsr     new_bsout2
         jmp     _disable_rom
@@ -310,9 +375,11 @@ new_clrch:
         jsr     new_clrch2
         jmp     _disable_rom
 
+.global new_clall2
 new_clall2:
         lda     #0
         sta     $98
+.global new_clrch2
 new_clrch2:
         jsr     ulti_clrchn
         lda     #4
