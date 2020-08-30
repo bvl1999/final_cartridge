@@ -515,12 +515,21 @@ ulti_ckout:
             beq :+
 
             lda #5
-            sta $0403
             sec
             ror STATUS
             rts
 
-:           ldx #UCI_CMD_CHKOUT
+:           lda SECADDR
+            and #$F0
+            cmp #$F0
+            beq _opn
+            cmp #$E0
+            beq _clse
+            ldx #UCI_CMD_CHKOUT
+            .byte $2c
+_opn        ldx #UCI_CMD_OPEN
+            .byte $2c
+_clse       ldx #UCI_CMD_CLOSE
             jsr uci_setup_cmd    ; do not execute command, because we are waiting for data now
             lda #0
             clc

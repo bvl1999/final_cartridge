@@ -306,10 +306,12 @@ _ckout_iec:
         tax
         jsr     LISTEN
         lda     SA
+/* - we do not support not sending secondary address, because we also use this function for OPEN and CLOSE, where SA is Ex and Fx respectively
         bpl     :+
         jsr     $EDBE ; release ATN
         bne     :++
 :
+*/
         jsr     SECOND
         txa
 :

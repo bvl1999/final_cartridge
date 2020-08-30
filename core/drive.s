@@ -108,6 +108,7 @@ listen_6F_or_error:
         lda     #$6F
 listen_or_error:
         jsr     listen_second
+        lda     ST
         bmi     device_not_present
         rts
 

@@ -55,6 +55,7 @@
 
 ; from UCI
 .import new_clrch2
+.import new_bsin2
 .import new_bsout2
 
 ; from wrappers
@@ -510,18 +511,17 @@ pow10hi:
 
 ; ----------------------------------------------------------------
 
-; XXX this seems like a redundant "directory" implementation
 print_dir:
         lda     #$60
         jsr     talk_second
-        jsr     IECIN
-        jsr     IECIN
+        jsr     new_bsin2 ; IECIN
+        jsr     new_bsin2 ; IECIN
 L845E:  jsr     talk_60
-        jsr     IECIN
-        jsr     IECIN
-        jsr     IECIN
+        jsr     new_bsin2 ; IECIN
+        jsr     new_bsin2 ; IECIN
+        jsr     new_bsin2 ; IECIN
         tax
-        jsr     IECIN
+        jsr     new_bsin2 ; IECIN
         ldy     ST
         bne     L84C0
         jsr     L84DC
@@ -530,7 +530,7 @@ L845E:  jsr     talk_60
         jsr     _basic_bsout
         ldx     #$18
 L847F:  jsr     talk_60
-        jsr     IECIN
+        jsr     new_bsin2 ; IECIN
 L8485:  cmp     #CR
         beq     L848D
         cmp     #CR + $80
@@ -551,13 +551,13 @@ L84A6:  jsr     GETIN
 L84AB:  dex
         bpl     L847F
         jsr     talk_60
-        jsr     IECIN
+        jsr     new_bsin2 ; IECIN
         bne     L8485
         jsr     L84DC
         lda     #CR
         jsr     _basic_bsout
         bne     L845E
-L84C0:  lda     #$E0
+L84C0:  lda     #$E0 ; close
         jsr     talk_second
         jmp     new_clrch2 ; UNLSTN
 
@@ -1503,7 +1503,7 @@ PDIR:   jsr     get_secaddr_and_send_listen
 
 
 L8B79:  jsr     new_clrch2 ; UNLSTN
-        lda     #$F0
+        lda     #$F0 ; OPEN channel 0...
         jsr     listen_or_error
         lda     $9A
         cmp     #4
@@ -1515,10 +1515,8 @@ L8B79:  jsr     new_clrch2 ; UNLSTN
 
 :       jsr     send_drive_cmd
 L8B95:  jsr     print_dir
-        jsr     set_io_vectors
-        jsr     CLRCH
-        jsr     set_io_vectors_with_hidden_rom
-        jmp     L8A53
+        jsr     new_clrch2
+        rts
 
 ; ----------------------------------------------------------------
 ; common code for DLOAD/DVERIDY/DSAVE/DOS
