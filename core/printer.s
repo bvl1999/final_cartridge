@@ -215,15 +215,16 @@ set_io_vectors_with_hidden_rom2:
         tya
         pha
         ldy     #18
-:       lda     hidden_vectors+1,y
+:
+        lda     hidden_vectors+1,y
         beq     :+
         sta     $031B,y
         lda     hidden_vectors,y
         sta     $031A,y
-:       dey
+:
+        dey
         dey
         bpl     :--
-;        sty     FC3_HIDDEN ; FF
         pla
         tay
         rts
@@ -233,16 +234,16 @@ set_io_vectors2:
         tya
         pha
         ldy     #18
-:       lda     rom_vectors+1,y
+:
+        lda     rom_vectors+1,y
         beq     :+
         sta     $031B,y
         lda     rom_vectors,y
         sta     $031A,y
-:       dey
+:
+        dey
         dey
         bpl     :--
-;        iny
-;        sty     FC3_HIDDEN ; 00
         pla
         tay
         rts

@@ -31,6 +31,7 @@ QTSW            := $D4   ; quote mode flag
 TBLX            := $D6   ; cursor line
 INSRT           := $D8   ; insert mode counter
 LDTB1           := $D9   ; screen line link table
+DEVFROM         := $99   ; Current input device
 
 BUF             := $0200 ; system input buffer
 KEYD            := $0277 ; keyboard buffer

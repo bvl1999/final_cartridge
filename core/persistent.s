@@ -371,8 +371,13 @@ _new_ckin:
 
 .global _new_bsin
 _new_bsin:
-        jsr     _enable_rom
-        jmp     new_bsin
+        lda DEVFROM
+        cmp UCI_DEVICE
+        beq :+
+        jmp (CHRIN_ORIG)
+        jsr _enable_rom
+:
+        jmp new_bsin
 
 .global _new_getin
 _new_getin:

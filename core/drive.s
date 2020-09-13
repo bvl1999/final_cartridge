@@ -28,6 +28,7 @@
 .import new_bsin2
 .import new_bsout2
 .import new_clrch2
+.import new_clall2
 
 .segment "drive"
 
@@ -113,6 +114,7 @@ listen_or_error:
         rts
 
 device_not_present:
+        jsr     new_clall2
         ldx     #5 ; "DEVICE NOT PRESENT"
         jmp     disable_rom_jmp_error
 
