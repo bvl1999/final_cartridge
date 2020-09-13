@@ -71,7 +71,7 @@
 
         STATUS     = $90
         VERIFYFLAG = $93
-        DEVFROM    = $99
+        ;DEVFROM    = $99
         DEVTO      = $9A
         LOADPNTR   = $AE
         SECADDR    = $B9
@@ -420,10 +420,10 @@ new_bsin2:
 ; Real address: ($0324), $F157.
 
         ; should always exit with RTS!
-;            lda DEVFROM
-;            cmp UCI_DEVICE
-;            beq my_chrin
-;            jmp (CHRIN_ORIG) ; runs with the ROM on.. which is valid. its RTS will bring us to new_bsin; which performs _disable_rom
+            lda DEVFROM
+            cmp UCI_DEVICE
+            beq my_chrin
+            jmp (CHRIN_ORIG) ; runs with the ROM on.. which is valid. its RTS will bring us to new_bsin; which performs _disable_rom
 ;
 my_chrin    ; is there any data available in the current buffer?
             lda CMD_IF_CONTROL
