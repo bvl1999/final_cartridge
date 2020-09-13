@@ -558,7 +558,10 @@ _breakup_out
 
 ;; UCI
 uci_setup_cmd
-            sec
+            bit UCI_PENDING_CMD
+            bpl :+
+            jsr uci_abort ; this will also abort an open command by executing it
+:           sec
             ror UCI_PENDING_CMD
             lda #UCI_TARGET
             sta CMD_IF_COMMAND
@@ -612,20 +615,20 @@ _ack1       lda CMD_IF_CONTROL
             pla
             rts
 
-uci_abort   lda CMD_IF_CONTROL
+uci_abort   ; may be in command state
+            bit UCI_PENDING_CMD
+            bpl _abrt2 ; Bit 7 not set, no pending command
+            jsr uci_execute
+            jsr uci_ack
+_abrt2      lda CMD_IF_CONTROL
             and #CMD_STATE_DATA
             beq _abrt1 ; NOT in Data state
             ; Perform Abort of current command
             lda #CMD_ABORT
             sta CMD_IF_CONTROL
             jsr uci_wait_abort
-            rts
-_abrt1      ; Not in data state, but may be in command state
-            bit UCI_PENDING_CMD
-            bpl _abrt2 ; Bit 7 not set, no pending command
-            jsr uci_execute
-            jsr uci_ack
-_abrt2      rts
+_abrt1      rts
+
 
 
 uci_wait_abort
