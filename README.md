@@ -1,3 +1,16 @@
+# UUC based on Final Cartridge III
+
+This project was forked from the FC III project described below, it has been modified to support functionality of the U64 and UII+ cartridge.
+Changes include:
+- complete removal of speeder code
+- addition of 'hyperspeed' filesystem access
+- new udrive, uload, usave, uspeed and ultimate commands
+
+udrive queries or sets the drive used for hyperspeed access
+uload/usave load or save from the udrive
+uspeed queries and sets the turbo mode control register on a U64 (if enabled) or the fast mode bit on a C128
+ultimate.. try it
+
 # Final Cartridge
 
 This project is the reverse-engineered and documented Commodore 64 cc65/ca65/cl65 assembly source code of the first bank of the "*Final Cartridge III*".
