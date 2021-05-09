@@ -20,6 +20,7 @@
 .import new_ckout
 .import new_open
 .import new_close
+.import _nmi_alt_handler
 
 ; from basic
 .import reset_warmstart
@@ -375,14 +376,22 @@ _new_bsin:
         cmp UCI_DEVICE
         beq :+
         jmp (CHRIN_ORIG)
-        jsr _enable_rom
 :
+        jsr _enable_rom
         jmp new_bsin
 
 .global _new_getin
 _new_getin:
         jsr     _enable_rom
         jmp     new_getin
+
+_new_nmi:
+        jsr     _enable_rom
+        jsr     _nmi_alt_handler
+        lda     #$70
+        sta     $DFFF
+        jmp     $fe72
+
 /*
 .global LDFE0
 LDFE0:

@@ -210,6 +210,32 @@ L824D:  nop
         nop ; used to be "jsr new_tokenize" in 1988-05
         jmp     WA49F
 
+; hack to stop tokenizing when detecting well known external dos wedge and shortcuts
+_first_token:
+        cmp     #'/'
+        bne     _noslash
+        jmp     _cont_parse
+_noslash:
+        cmp     #'*'
+        bne     _nostar
+        jmp     _cont_parse
+_nostar:
+        cmp     #'_'
+        bne     _nolarr
+        jmp     _cont_parse
+_nolarr:
+        cmp     #$5e
+        bne     _nouparr
+        jmp     _cont_parse
+_nouparr:
+        cmp     #'%'
+        bne     _nopercent
+        jmp     _cont_parse
+_nopercent:
+        cmp #'@'
+        bne     _noat
+        jmp     _cont_parse
+
 ; this is 99% identical with the code in BASIC ROM at $A57C
 new_tokenize:
 ; **** this is the same code as BASIC ROM $A579-$A5AD (start) ****
@@ -233,10 +259,8 @@ L8265:  cmp     #' '
         bne     _nopr
         lda     #$99 ; PRINT token
         bne     _tkfnd
-_nopr:  cmp     #'@'
-        bne     _noat
-        lda     #$D8 ; DOS token
-        bne     _tkfnd
+_nopr:  cpy     #4
+        beq     _first_token
 _noat:  cmp     #'0'
         bcc     L8283
         cmp     #$3C
@@ -326,6 +350,20 @@ L830B:  sta     $01FD,y
         lda     #$FF
         sta     TXTPTR
         rts
+
+; just copy input to parse buffer and exit (used to prevent parsing anything after detecting a jiffydos style wedge or shortcut command)
+_cont_parse_loop:
+        lda    $0200,x
+_cont_parse:
+        inx
+        iny
+        sta     $01FB,y
+        lda     $01FB,y
+        bne     _cont_parse_loop
+        stx     TXTPTR
+        sty     $71
+        jmp     L830B
+
 ; **** this is the same code as BASIC ROM $A604-$A612 (end) ****
 
 new_execute:
@@ -783,6 +821,7 @@ new_basic_keywords:
         .byte   "ULOA", 'D' + $80         ; 67
         .byte   "UVERIF", 'Y' + $80       ; 68
         .byte   "USAV", 'E' + $80         ; 69
+        .byte   "USPEE", 'D' + $80        ; 6A
         .byte 0
 
 command_vectors:
@@ -816,6 +855,7 @@ command_vectors:
         .word   ULOAD-1
         .word   UVERIFY-1
         .word   USAVE-1
+        .word   USPEED-1
 
 end_of_command_vectors:
 
@@ -2297,6 +2337,166 @@ USAVE:  jsr     set_filename_or_empty
         sta     FA
         jmp     WE159
 
+;------------------------------------------------------------------
+; "USPEED" Command - query or set CPU speed on U64 and C128
+;------------------------------------------------------------------
+USPEED: beq _uspeed_no_param
+;        sta $9fff
+        jsr _get_int
+        lda $15
+        beq _uspeed_ok
+; fall through on purpose
+_uspeed_nok:
+        ldx #14 ; Illegal QTY
+        jmp disable_rom_jmp_error
+
+_uspeed_control_nok:
+        ldx #0
+:       lda _uspeed_control_nok_msg,x
+        beq :+
+        jsr $E716 ; char to screen
+        inx
+        bne :-
+:       jmp WA8F8
+
+_uspeed_ok:
+        lda $14
+        beq _uspeed_nok
+        jsr _uspeed_use_tb_or_tr
+        bcc _uspeed_control_nok
+        beq _uspeed_set_tr
+        ldx $14
+        cpx #3
+        bcs _uspeed_nok
+        dex
+        stx $d030
+        jmp _uspeed_no_param
+
+_uspeed_set_tr:
+        ldy #0
+        ldx #$10
+        lda $14
+        bpl :+
+        iny
+        sec
+        lda #0
+        sbc $14
+:       cmp _uspeed_data-1,x      ; locate provided value in table of valid speeds
+        beq _uspeed_found_value   ; found something
+        dex
+        bne :-
+        beq _uspeed_nok           ; invalid speed provided
+
+_uspeed_found_value:
+        dex
+        txa
+        cpy #1                    ; badline timing on/off?
+        bne :+
+        ora #$80                  ; off
+:       sta $d031
+
+;       fall through in no param part of this function to show output
+_uspeed_no_param:
+        jsr _uspeed_use_tb_or_tr  ; see if some turbo mode control is available
+        bcs _uspeed_show_control  ; yes, print info on it
+        jmp _uspeed_control_nok   ; nothing found
+
+; if turbo mode register available, display speed and state of badline timing. If not, print C128 fast mode bit info
+_uspeed_show_control:
+        bne _uspeed_show_tb
+        lda $d031
+        and #$0f
+        tax
+        lda _uspeed_data,x
+        tax
+        lda #0
+        jsr _print_ax_int
+        ldx #0
+:       lda _uspeed_tr_msg,x
+        beq :+
+        jsr $E716
+        inx
+        bne :-
+:       lda #0
+        bit $d031
+        bmi :+
+        lda #1
+:       jsr _show_on_off
+:       lda #13
+        jsr $E716
+        jmp WA8F8
+
+; print state of C128 style fast mode
+_uspeed_show_tb:
+        ldx #0
+:       lda _uspeed_tb_msg,x
+        beq :+
+        jsr $E716
+        inx
+        bne :-
+:       lda $d030
+        and #$01
+        cmp #1
+        jsr _show_on_off
+        jmp :---
+
+; test if some means of turbo mode control is available
+; carry is clear on return when nothing found, set when something was found, in which case A will be
+; 0 for U64 turbo mode register
+; 1 for C128 style fast mode bit
+_uspeed_use_tb_or_tr:
+        lda $d031                ; check U64 turbo mode register, it is also available when the 'turbomode bit' is enabled.
+        cmp #$ff                 ; if disabled or not available, it should always contain #$ff
+        beq _uspeed_try_tb
+        lda #0                   ; it is available, report this back to the caller
+        sec
+        rts
+
+; see if there is a fast mode enable bit at $d030
+_uspeed_try_tb:
+        lda $d030
+        cmp #$ff
+        bne _uspeed_uses_tb      ; if not available, it must contain #$ff, so if it doesn't, we know it is available
+        dec $d030                ; check if we can change bit 0
+        lda $d030
+        cmp #$ff
+        beq _uspeed_no_control   ; we can't
+        inc $d030                ; as bit 0 was seemingly set when we entered this function, ensure it is set again before we leave
+; C128 style fast mode bit found at $d030
+_uspeed_uses_tb:
+        lda #1                   ; report availability of fast mode control bit to caller
+        sec
+        rts
+
+; we did not detect any way to control turbo mode
+_uspeed_no_control:
+        clc
+        rts
+
+; print 'on' or 'off' depending on A being 0 or not 0
+_show_on_off:
+        pha
+        lda #'O'
+        jsr $E716
+        pla
+        bne :+
+        lda #'F'
+        jsr $E716
+        .byte $2C
+:       lda #'N'
+        jmp $E716
+
+_uspeed_control_nok_msg:
+.byte "TURBO CONTROL NOT ENABLED", 13, 0
+
+_uspeed_tb_msg:
+.byte "C128 FAST MODE: ", 0
+
+_uspeed_tr_msg:
+.byte " MHZ, BADLINE TIMING: ", 0
+
+_uspeed_data:
+.byte 1,2,3,4,5,6,8,10,12,14,16,20,24,32,40,48
 
 .segment "pack_code"
 

@@ -27,7 +27,7 @@ else
 	endif
 endif
 
-SOURCES=core/header.s core/vectors.s core/init.s core/basic.s core/drive.s core/desktop_helper.s core/speeder.s core/monitor.s core/wrappers.s core/editor.s core/printer.s core/format.s core/freezer.s core/persistent.s core/uci.s
+SOURCES=core/header.s core/vectors.s core/init.s core/basic.s core/drive.s core/desktop_helper.s core/monitor.s core/wrappers.s core/editor.s core/printer.s core/format.s core/freezer.s core/persistent.s core/uci.s
 
 DEPS=core/kernal.i core/persistent.i
 

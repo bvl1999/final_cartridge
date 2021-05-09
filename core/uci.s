@@ -20,12 +20,11 @@
 .global ulti_ckout
 .global ulti_chrout
 .global ckin_known_fasa
+.global new_load
+.global new_save
 
 .import hide
 .import unhide
-.import print_searching
-.import print_loading
-.import print_saving
 
 
 ;
@@ -71,7 +70,7 @@
 
         STATUS     = $90
         VERIFYFLAG = $93
-        ;DEVFROM    = $99
+;        DEVFROM    = $99
         DEVTO      = $9A
         LOADPNTR   = $AE
         SECADDR    = $B9
@@ -131,7 +130,9 @@ ld1         lda CMD_IF_COMMAND
             sec
             rts
 
-ld2         jsr print_searching
+ld2         php
+            sei
+            jsr print_searching
             ldx #UCI_CMD_LOADSU
             jsr uci_setup_cmd
             ldy #LOADADDR
@@ -139,14 +140,16 @@ ld2         jsr print_searching
             jsr uci_filename
             jsr uci_execute
             lda CMD_IF_STATUS
-            jsr uci_ack ; restores A
             beq ld3 ; all OK when zero
+            jsr uci_ack ; restores A
             lda #4  ; File not found error
+            plp
             sec
             rts
 
 ld3         jsr print_loading
 
+            jsr uci_ack
             ldx #UCI_CMD_LOADEX
             jsr uci_setup_cmd
             jsr uci_execute
@@ -162,6 +165,7 @@ ld3         jsr print_loading
             jsr uci_ack ; restores A
             ldx LOADPNTR
             ldy LOADPNTR+1
+            plp
             clc
             rts
 
@@ -169,6 +173,7 @@ _verify_err jsr uci_ack ; restores A
             lda #$10
             ora STATUS
             sta STATUS
+            plp
             clc
             rts
 
@@ -198,7 +203,9 @@ sv1         lda CMD_IF_COMMAND
             sec
             rts
 
-sv2         jsr print_saving
+sv2         php
+            sei
+            jsr print_saving
             ldx #UCI_CMD_SAVE
             jsr uci_setup_cmd
             ldy #SAVEADDR
@@ -209,14 +216,17 @@ sv2         jsr print_saving
             beq sv3 ; all OK when zero
 
             jsr uci_ack
+            plp
             sec
             lda #7 ; not output file :)
             rts
 
 sv3         jsr uci_ack
+            plp
             clc
             rts
 
+.segment "ultimate2"
 
 ; ----------------------------------------------------------------
 new_open2:
@@ -251,8 +261,14 @@ op1         ; The OPEN_ORIG function may use CLRCHN and BSOUT. Secondly, since i
             ; Note, that if open were to be called from the ROM, a copy of the kernal 'OPEN' routine must be implemented, with all the diversity
             ; of paths; including RS232 support and all.
             ;
+            ; BAD assumption:
             ; Because we can only be called from outside of the rom, we MUST have entered here through persistent jump. Thus the vectors are for
             ; hidden ROM, and must stay that way. No need to set new vectors.
+            ; in fact we get called from printer.s, so we need to remove the address jsr left on the stack
+
+            pla
+            pla
+
             lda OPEN_ORIG+1
             pha
             lda OPEN_ORIG
@@ -335,17 +351,24 @@ cl2         pla ; restore stack for exit
             ; This is not a problem, as the RAM is not queried for the filename; neither does it jump to CLRCHN or BSOUT to print an error.
             ; We will return in the rom; as RTS brings us to new_close, which then jumps to _disable_rom.
 
-myclose     lda CMD_IF_COMMAND
+myclose     
+            lda CMD_IF_COMMAND
             cmp #UCI_IDENTIFIER
             bne cl2
-            pla ; restore stack, but we don't need A
 
             ldx #UCI_CMD_CLOSE
             jsr uci_setup_cmd
             jsr uci_execute
             jsr uci_ack
-            clc
-            rts ; go to _disable_rom in new_close.
+            pla ; restore stack
+            lda DEVNUM
+            jmp $f2f2 ; jx150+1, skip pla at the start
+                      ; rts of this will return to new_close in persistent.s, which will call _disable_rom.
+                      ; it seems this might error when a known fasa condition occured earlier.
+;            jsr $f2f2
+;            bcc :+
+;            inc $d020
+;:           rts
 
 ; ----------------------------------------------------------------
 new_ckin2:
@@ -370,6 +393,8 @@ ckin_known_fasa:
             bcs _ckin_iec
 
             ; non-IEC, i.e. device 1, 2, or 3
+            pla
+            pla
             lda #>(CHKIN_CONTINUED-1)
             pha
             lda #<(CHKIN_CONTINUED-1)
@@ -399,6 +424,7 @@ _ckin_iec   tax ; save A for later
 
 
 _my_chkin   sta DEVFROM
+            lda DEVFROM
 do_chkin    ldx #UCI_CMD_CHKIN
             jsr uci_setup_cmd
             jsr uci_execute
@@ -408,7 +434,7 @@ _ckin_ok    sta DEVFROM
             clc
             rts
 
-.segment "ultimate2"
+; .segment "ultimate2"
 
 ; ----------------------------------------------------------------
 new_bsin2:
@@ -495,9 +521,14 @@ getin       lda DEVFROM
 ;
 ; This is called as a subroutine from FC3 code
 ulti_clrchn:
-            lda DEVNUM
-            cmp UCI_DEVICE
+            lda UCI_DEVICE
+            cmp DEVTO
             beq _my_clrchn
+            cmp DEVFROM
+            beq _my_clrchn
+            cmp DEVNUM
+            beq _my_clrchn
+            
 _clr2       rts
 
 _my_clrchn  lda CMD_IF_COMMAND
@@ -530,6 +561,7 @@ ulti_ckout:
 _opn        ldx #UCI_CMD_OPEN
             .byte $2c
 _clse       ldx #UCI_CMD_CLOSE
+            jsr uci_abort
             jsr uci_setup_cmd    ; do not execute command, because we are waiting for data now
             lda #0
             clc
@@ -558,10 +590,8 @@ _breakup_out
 
 ;; UCI
 uci_setup_cmd
-            bit UCI_PENDING_CMD
-            bpl :+
             jsr uci_abort ; this will also abort an open command by executing it
-:           sec
+            sec
             ror UCI_PENDING_CMD
             lda #UCI_TARGET
             sta CMD_IF_COMMAND
@@ -584,6 +614,8 @@ uci_setup_range
             rts
 
 uci_filename
+            php
+            sei
             lda NAMELEN
             beq _fn2
             ldy #$00
@@ -592,7 +624,8 @@ _fn1        jsr _load_FNADR_indy
             iny
             cpy NAMELEN
             bne _fn1
-_fn2        rts
+_fn2        plp
+            rts
 
 uci_execute lda #CMD_PUSH_CMD
             sta CMD_IF_CONTROL
@@ -653,7 +686,6 @@ _cpy        lda uci_exec_ram,x
 uci_exec_ram:
             lda $01
             pha
-            sei
             lda #$35 ; cannot use $34 here, for obvious reasons... I/O?
             sta $01
             lda #0
@@ -666,9 +698,90 @@ _wbr1       lda CMD_IF_CONTROL
             beq _wbr1
             pla
             sta $01
-            cli
             rts
 uci_exec_ram_end:
+
+/* 
+'stolen' from speeder.s
+*/
+
+do_uci_load:
+        jmp     ulti_load ; exits with RTS, continues in persistent.s
+
+new_load:
+        sty     $93
+        tya
+        ldy     FA
+        cpy     UCI_DEVICE
+        beq     do_uci_load
+        pla
+        pla
+        pla
+        tay
+        lda     #$F4
+        pha
+        lda     #$A6 ; F4A7 is normal continuation of kernal load routine
+        pha
+        jmp     _disable_rom_set_01
+
+
+do_uci_save:
+        jmp     ulti_save ; returns with RTS and continues in persistent.s
+
+new_save:
+        lda     FA
+        cmp     UCI_DEVICE
+        beq     do_uci_save
+        pla
+        pla
+        pla
+        tay
+        lda #$f5
+        pha
+        lda #$ec      ; F5ED
+        pha
+        jmp      _disable_rom_set_01
+
+
+print_searching:
+        lda     $9D
+        bpl     LA7A7
+        ldy     #$0C ; "SEARCHING"
+        jsr     print_kernal_string
+        lda     $B7
+        beq     LA7A7
+        ldy     #$17 ; "FOR"
+        jsr     print_kernal_string
+LA796:  ldy     $B7
+        beq     LA7A7
+        ldy     #0
+LA79C:  jsr     _load_FNADR_indy
+        jsr     $E716 ; KERNAL: output character to screen
+        iny
+        cpy     $B7
+        bne     LA79C
+LA7A7:  rts
+
+print_loading:
+        ldy     #$49 ; "LOADING"
+        lda     $93
+        beq     LA7B3
+        ldy     #$59 ; "VERIFYING"
+        .byte   $2C
+print_saving:
+        ldy     #$51 ; "SAVING"
+LA7B3:  bit     $9D
+        bpl     LA7C4
+print_kernal_string:
+        lda     $F0BD,y ; KERNAL strings
+        php
+        and     #$7F
+        jsr     $E716 ; KERNAL: output character to screen
+        iny
+        plp
+        bpl     print_kernal_string ; until MSB set
+LA7C4:  clc
+        rts
 
 
 /* ROM NESTING RESEARCH:

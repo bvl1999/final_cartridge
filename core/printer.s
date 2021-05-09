@@ -12,6 +12,7 @@
 .global set_io_vectors
 .global something_with_printer
 .global new_open
+.global new_open_r
 .global new_close
 .global new_ckin
 .global new_ckout
@@ -23,6 +24,9 @@
 
 .global ckout_known_fasa
 .global new_bsout2
+
+.global nmi_alt_handler
+.global _nmi_alt_handler
 
 .import new_open2
 .import new_close2
@@ -198,7 +202,7 @@ hidden_vectors:
         .addr _new_clall
 
 rom_vectors:
-        .addr new_open2
+        .addr new_open
         .addr new_close2
         .addr new_ckin2
         .addr new_ckout2
@@ -267,15 +271,20 @@ LA168:  ; Function shall not be wrongly called from within the ROM. CKOUT on a f
         ; $F250 ; KERNAL CKOUT -> may fall through to clrch
         pla
         tax
+        pla
+        pla
         lda     #>($F250 - 1)
         pha
         lda     #<($F250 - 1)
         pha
         jmp     _disable_rom
+;        jmp     $f250
 
 LA173:  jsr     $F31F ; set file par from table
         lda     FA
         beq     LA168 ; keyboard? will fail again eventually in the original ROM with error 7
+        cmp     #$03  ; screen? let original rom handle it
+        beq     LA168
 
         ; assume that we will be able to set the output - prestore. Fix if error
 _known:
@@ -315,7 +324,7 @@ _ckout_iec:
 */
         jsr     SECOND
         txa
-:
+;:
         bit     ST   ;DID HE LISTEN?
         bpl     :+
 
@@ -828,6 +837,10 @@ new_open:
         jsr new_open2
         jmp _disable_rom
 
+new_open_r:
+        jsr new_open2
+        jmp _disable_rom
+
 new_close:
         jsr new_close2
         jmp _disable_rom
@@ -843,3 +856,27 @@ new_bsin:
 new_getin:
         jsr new_getin2
         jmp _disable_rom
+
+nmi_alt_handler:
+        jsr _nmi_alt_handler
+        jmp $fe72
+
+_nmi_alt_handler:
+        inc $d020
+        lda #$7f
+        sta $dc00
+:
+        lda $dc01
+        cmp $dc01
+        bne :-
+        cmp #$7f
+        bne _no_stop
+        dec $d020
+        lda #$fe
+        pha
+        lda #$65
+        pha
+        jmp _disable_rom      ; we are killing whatever was running, so disable rom
+_no_stop:
+        dec $d020
+        rts
