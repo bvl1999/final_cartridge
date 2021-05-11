@@ -2341,7 +2341,6 @@ USAVE:  jsr     set_filename_or_empty
 ; "USPEED" Command - query or set CPU speed on U64 and C128
 ;------------------------------------------------------------------
 USPEED: beq _uspeed_no_param
-;        sta $9fff
         jsr _get_int
         lda $15
         beq _uspeed_ok
