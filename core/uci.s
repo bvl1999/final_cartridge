@@ -16,7 +16,8 @@
 .global new_ckin2
 .global new_bsin2
 .global new_getin2
-.global ulti_clrchn
+.global ulti_clrchn_unlsn
+.global ulti_clrchn_untlk
 .global ulti_ckout
 .global ulti_chrout
 .global ckin_known_fasa
@@ -365,10 +366,6 @@ myclose
             jmp $f2f2 ; jx150+1, skip pla at the start
                       ; rts of this will return to new_close in persistent.s, which will call _disable_rom.
                       ; it seems this might error when a known fasa condition occured earlier.
-;            jsr $f2f2
-;            bcc :+
-;            inc $d020
-;:           rts
 
 ; ----------------------------------------------------------------
 new_ckin2:
@@ -383,9 +380,12 @@ new_ckin2:
             jsr FILE_LOOKUP_X       ; as copied from stock kernal
             bne error3              ; as copied from stock kernal
 _cki1       jsr GET_FILE_PARAMS     ; as copied from stock kernal
+            jmp _cki2
 
 ckin_known_fasa:
+            inc $d021
             lda DEVNUM
+_cki2:
             beq _ckin_ok
             cmp UCI_DEVICE
             beq _my_chkin
@@ -520,21 +520,26 @@ getin       lda DEVFROM
 ; Real address: ($0322), $F333.
 ;
 ; This is called as a subroutine from FC3 code
-ulti_clrchn:
-            lda UCI_DEVICE
-            cmp DEVTO
-            beq _my_clrchn
-            cmp DEVFROM
-            beq _my_clrchn
-            cmp DEVNUM
-            beq _my_clrchn
-            
-_clr2       rts
 
-_my_clrchn  lda CMD_IF_COMMAND
+ulti_clrchn_unlsn:
+            lda CMD_IF_COMMAND
             cmp #UCI_IDENTIFIER
-            bne _clr2
-            jmp uci_abort ; will handle both cases of pending command and pending data state
+            bne :+
+            lda DEVTO
+            cmp UCI_DEVICE
+            bne :+
+            jmp uci_abort
+:           jmp     $EDFE ; UNLISTEN
+
+ulti_clrchn_untlk
+            lda CMD_IF_COMMAND
+            cmp #UCI_IDENTIFIER
+            bne :+
+            lda DEVFROM
+            cmp UCI_DEVICE
+            bne :+
+            jmp uci_abort
+:           jmp     $EDEF ; UNTALK
 
 ulti_ckout:
             lda #0
@@ -548,6 +553,7 @@ ulti_ckout:
             lda #5
             sec
             ror STATUS
+_clr2
             rts
 
 :           lda SECADDR
@@ -654,8 +660,8 @@ uci_abort   ; may be in command state
             jsr uci_execute
             jsr uci_ack
 _abrt2      lda CMD_IF_CONTROL
-            and #CMD_STATE_DATA
-            beq _abrt1 ; NOT in Data state
+            ;and #CMD_STATE_DATA
+            ;beq _abrt1 ; NOT in Data state
             ; Perform Abort of current command
             lda #CMD_ABORT
             sta CMD_IF_CONTROL

@@ -33,7 +33,8 @@
 .import new_ckin2
 .import new_bsin2
 .import new_getin2
-.import ulti_clrchn
+.import ulti_clrchn_untlk
+.import ulti_clrchn_unlsn
 .import ulti_ckout
 .import ulti_chrout
 
@@ -278,7 +279,6 @@ LA168:  ; Function shall not be wrongly called from within the ROM. CKOUT on a f
         lda     #<($F250 - 1)
         pha
         jmp     _disable_rom
-;        jmp     $f250
 
 LA173:  jsr     $F31F ; set file par from table
         lda     FA
@@ -294,18 +294,12 @@ _known:
         pla     ; consume PHA from second line of this function
         jmp     ulti_ckout ; should exit with RTS
 
-:       cmp     #4 ; printer
-        beq     _printer
-        bcs     _ckout_iec ;LA168
+:       jmp _ckout_iec
 
-_printer:
-        jsr     LA183
-        bcs     _ckout_iec
-        pla     ; consume PHA from second line of this function
-        rts
 
 ckout_known_fasa:
         pha
+        inc     $d020
         jmp     _known
 
 ; Our own bit of code to perform the ckout on iec; which will not call BSOUT on error, but simply return an error code. Also we will call our own
@@ -360,8 +354,8 @@ new_bsout2:
         cmp     UCI_DEVICE
         bne     :+
         jmp     ulti_chrout ; char on stack!
-:       cmp     #4
-        beq     LA1AD
+:;       cmp     #4
+;        beq     LA1AD
 LA1A9:  pla
         jmp     $F1CA ; KERNAL BSOUT
 
@@ -393,24 +387,33 @@ new_clall2:
         sta     $98
 .global new_clrch2
 new_clrch2:
-        jsr     ulti_clrchn
+        ;jsr     ulti_clrchn
         lda     #4
         ldx     #3
-        cmp     $9A
-        bne     LA1E7
-        bit     $DD0C
-        bpl     LA1E7
-        jsr     LA09F
-        beq     LA1EE
+;        cmp     $9A
+;        bne     LA1E7
+;        bit     $DD0C
+;        bpl     LA1E7
+;        jsr     LA09F
+;        beq     LA1EE
 LA1E7:  cpx     $9A
         bcs     LA1EE
-        jsr     $EDFE ; UNLISTEN
+        lda     #0
+        sta     $d020
+        jsr     ulti_clrchn_unlsn
+;        jsr     $EDFE ; UNLISTEN
+        ldx     #3
 LA1EE:  cpx     $99
         bcs     LA1F5
-        jsr     $EDEF ; UNTALK
+        lda     #0
+        sta     $d021
+        jsr     ulti_clrchn_untlk
+;        jsr     $EDEF ; UNTALK
+        ldx     #3
 LA1F5:  stx     $9A
         lda     #0
         sta     $99
+        clc
         rts
 
 LA1FC:  lda     SA
@@ -862,7 +865,6 @@ nmi_alt_handler:
         jmp $fe72
 
 _nmi_alt_handler:
-        inc $d020
         lda #$7f
         sta $dc00
 :
@@ -871,12 +873,10 @@ _nmi_alt_handler:
         bne :-
         cmp #$7f
         bne _no_stop
-        dec $d020
         lda #$fe
         pha
         lda #$65
         pha
         jmp _disable_rom      ; we are killing whatever was running, so disable rom
 _no_stop:
-        dec $d020
         rts
