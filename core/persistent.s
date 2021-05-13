@@ -55,10 +55,12 @@ _jmp_bank:
 
 .global _enable_rom
 _enable_rom:
+        php
         pha
         lda     #$40 ; bank 0
 LDE08:  sta     $DFFF
         pla
+        plp
         rts
 
 .global _disable_rom_set_01
@@ -66,6 +68,7 @@ _disable_rom_set_01:
         sty     $01
 .global _disable_rom
 _disable_rom:
+        php
         pha
         lda     #$70 ; no ROM at $8000; BASIC at $A000
         bne     LDE08
@@ -82,8 +85,7 @@ enable_all_roms:
 
 .global _new_load
 _new_load:
-        tay     ; load/verify flag  (tay appears twice here, since the FC3 uses the $0330 vector to determine whether it should use the PAL or NTSC load routine!)
-        tay     ; load/verify flag  (it increments $0330 based on the PAL/NTSC flag!)
+        tay
         lda     $01
         pha
         jsr     enable_all_roms
@@ -225,9 +227,7 @@ _int_to_ascii:
 _search_for_line:
         jsr     _disable_rom
         jsr     $A613 ; search for BASIC line
-        php
         jsr     _enable_rom
-        plp
         rts
 
 .global _ay_to_float
@@ -259,9 +259,7 @@ _print_ax_int:
 _CHRGET:
         jsr     _disable_rom
         jsr     CHRGET
-LDF21:  php
-        jsr     _enable_rom
-        plp
+LDF21:  jsr     _enable_rom
         rts
 
 .global _CHRGOT
