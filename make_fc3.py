@@ -18,7 +18,7 @@ def add_chip(fo, i):
 
 with open("fc3_wedge.crt", "wb") as fo:
     fo.write(b"C64 CARTRIDGE   ")
-    fo.write(struct.pack(">LBBHBBHL", 0x40, 1, 0, 3, 1, 1, 0, 0))
+    fo.write(struct.pack(">LBBHBBBBL", 0x40, 1, 0, 3, 1, 1, 0, 0, 0))
     name = b"U64 DOS WEDGE V0.1"
     name += b"\0" * (32 - len(name))
     fo.write(name)
