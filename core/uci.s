@@ -130,8 +130,7 @@ ld1         lda CMD_IF_COMMAND
             sec
             rts
 
-ld2         php
-            sei
+ld2         
             jsr print_searching
             ldx #UCI_CMD_LOADSU
             jsr uci_setup_cmd
@@ -143,7 +142,6 @@ ld2         php
             beq ld3 ; all OK when zero
             jsr uci_ack ; restores A
             lda #4  ; File not found error
-            plp
             sec
             rts
 
@@ -152,7 +150,7 @@ ld3         jsr print_loading
             jsr uci_ack
             ldx #UCI_CMD_LOADEX
             jsr uci_setup_cmd
-            jsr uci_execute
+            jsr uci_execute_from_ram
             lda CMD_IF_STATUS
             bmi _verify_err
 
@@ -165,7 +163,6 @@ ld3         jsr print_loading
             jsr uci_ack ; restores A
             ldx LOADPNTR
             ldy LOADPNTR+1
-            plp
             clc
             rts
 
@@ -173,7 +170,6 @@ _verify_err jsr uci_ack ; restores A
             lda #$10
             ora STATUS
             sta STATUS
-            plp
             clc
             rts
 
@@ -203,8 +199,7 @@ sv1         lda CMD_IF_COMMAND
             sec
             rts
 
-sv2         php
-            sei
+sv2         
             jsr print_saving
             ldx #UCI_CMD_SAVE
             jsr uci_setup_cmd
@@ -216,13 +211,11 @@ sv2         php
             beq sv3 ; all OK when zero
 
             jsr uci_ack
-            plp
             sec
             lda #7 ; not output file :)
             rts
 
 sv3         jsr uci_ack
-            plp
             clc
             rts
 
@@ -676,28 +669,33 @@ uci_clear_error
             rts
 
 uci_execute_from_ram
+            php
+            sei
+            lda $01
+            pha
+            lda #0
+            sta UCI_PENDING_CMD
             ldx #<(uci_exec_ram_end - uci_exec_ram - 1)
 _cpy        lda uci_exec_ram,x
             sta $0140,x
             dex
             bpl _cpy
+            lda #CMD_PUSH_CMD + %01000000
             jmp $0140
 
 uci_exec_ram:
-            lda $01
-            pha
-            lda #$35 ; cannot use $34 here, for obvious reasons... I/O?
-            sta $01
-            lda #0
-            sta UCI_PENDING_CMD
-            lda #CMD_PUSH_CMD
             sta CMD_IF_CONTROL
+            lda #$30
+            sta $01
+            lda $ff00
+            sta $ff00
 _wbr1       lda CMD_IF_CONTROL
             and #CMD_STATE_BITS
             cmp #CMD_STATE_BUSY
             beq _wbr1
             pla
             sta $01
+            plp
             rts
 uci_exec_ram_end:
 
